@@ -7,12 +7,14 @@ import '../services/settings_storage_service.dart';
 class VehicleProvider extends ChangeNotifier {
   VehicleStatus _status = const VehicleStatus();
   String _driverName = "Change Me";
+  bool _driverNamePromptSkipped = false;
   Timer? _liveTelemetryTimer;
   final Random _random = Random();
 
   VehicleStatus get status => _status;
   String get driverName => _driverName;
   bool get isDefaultDriverName => _driverName == "Change Me";
+  bool get driverNamePromptSkipped => _driverNamePromptSkipped;
 
   VehicleProvider() {
     _startLiveSimulation();
@@ -21,13 +23,22 @@ class VehicleProvider extends ChangeNotifier {
 
   Future<void> _loadStoredDriverName() async {
     _driverName = await SettingsStorageService().loadDriverName();
+    _driverNamePromptSkipped = await SettingsStorageService().loadDriverNamePromptSkipped();
     notifyListeners();
   }
 
   Future<void> updateDriverName(String newName) async {
     final trimmed = newName.trim();
     _driverName = trimmed.isEmpty ? "Change Me" : trimmed;
+    _driverNamePromptSkipped = true;
     await SettingsStorageService().saveDriverName(_driverName);
+    await SettingsStorageService().saveDriverNamePromptSkipped(true);
+    notifyListeners();
+  }
+
+  Future<void> skipDriverNamePrompt() async {
+    _driverNamePromptSkipped = true;
+    await SettingsStorageService().saveDriverNamePromptSkipped(true);
     notifyListeners();
   }
 

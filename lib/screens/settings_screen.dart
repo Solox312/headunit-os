@@ -31,6 +31,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
+              alignment: Alignment.topCenter,
+              insetPadding: const EdgeInsets.only(top: 40, left: 24, right: 24),
               backgroundColor: AutomotiveColors.glassPanel,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),

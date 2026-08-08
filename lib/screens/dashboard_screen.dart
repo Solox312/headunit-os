@@ -40,7 +40,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final vehicle = context.read<VehicleProvider>();
-      if (vehicle.isDefaultDriverName) {
+      if (vehicle.isDefaultDriverName && !vehicle.driverNamePromptSkipped) {
         _showEditDriverNameDialog(context, vehicle);
       }
     });
@@ -113,13 +113,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                              "HeadUnit OS",
-                                              style: GoogleFonts.spaceGrotesk(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                                color: AutomotiveColors.textPrimary,
-                                              ),
+                                            Consumer<VehicleProvider>(
+                                              builder: (context, vehicle, child) {
+                                                return InkWell(
+                                                  onTap: () => _showEditDriverNameDialog(context, vehicle),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Text(
+                                                        vehicle.getTimedGreeting(),
+                                                        style: GoogleFonts.spaceGrotesk(
+                                                          fontSize: 18,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: vehicle.isDefaultDriverName
+                                                              ? AutomotiveColors.orangeAccent
+                                                              : AutomotiveColors.textPrimary,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 6),
+                                                      Icon(
+                                                        Icons.edit_outlined,
+                                                        size: 14,
+                                                        color: vehicle.isDefaultDriverName
+                                                            ? AutomotiveColors.orangeAccent
+                                                            : AutomotiveColors.textSecondary,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
                                             ),
                                             Text(
                                               isConnected ? "System Online • $ssid" : "System Online • Vehicle Standby",
@@ -189,57 +212,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   color: AutomotiveColors.electricCyan,
                                 ),
                               ),
-                              const SizedBox(height: 12),
-                              // Timed Greeting & Driver Name Badge
-                              Consumer<VehicleProvider>(
-                                builder: (context, vehicle, child) {
-                                  final bool isDefaultName = vehicle.isDefaultDriverName;
-                                  return InkWell(
-                                    onTap: () => _showEditDriverNameDialog(context, vehicle),
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: isDefaultName
-                                            ? AutomotiveColors.orangeAccent.withAlpha(25)
-                                            : AutomotiveColors.electricCyan.withAlpha(20),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                          color: isDefaultName
-                                              ? AutomotiveColors.orangeAccent.withAlpha(120)
-                                              : AutomotiveColors.electricCyan.withAlpha(80),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            isDefaultName ? Icons.edit_note_rounded : Icons.person_rounded,
-                                            color: isDefaultName ? AutomotiveColors.orangeAccent : AutomotiveColors.electricCyan,
-                                            size: 16,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            vehicle.getTimedGreeting(),
-                                            style: GoogleFonts.inter(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: isDefaultName ? AutomotiveColors.orangeAccent : AutomotiveColors.textPrimary,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Icon(
-                                            Icons.edit_outlined,
-                                            size: 13,
-                                            color: isDefaultName ? AutomotiveColors.orangeAccent : AutomotiveColors.textSecondary,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 20),
                               const Divider(color: AutomotiveColors.strokeSoft),
                               const SizedBox(height: 12),
                               // Quick App Launchers
@@ -555,6 +528,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
+          alignment: Alignment.topCenter,
+          insetPadding: const EdgeInsets.only(top: 40, left: 24, right: 24),
           backgroundColor: AutomotiveColors.glassPanel,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -613,10 +588,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             TextButton(
               onPressed: () {
                 context.read<KeyboardProvider>().hide();
+                vehicle.skipDriverNamePrompt();
                 Navigator.pop(context);
               },
               child: Text(
-                "Cancel",
+                "Skip & Don't Ask Again",
                 style: GoogleFonts.inter(color: AutomotiveColors.textSecondary),
               ),
             ),

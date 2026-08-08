@@ -118,4 +118,18 @@ class SettingsStorageService {
     }
     return false;
   }
+
+  /// Helper to save driver name prompt skipped state.
+  Future<void> saveDriverNamePromptSkipped(bool skipped) async {
+    await saveSettings({'driverNamePromptSkipped': skipped});
+  }
+
+  /// Helper to read stored driver name prompt skipped state (defaults to false).
+  Future<bool> loadDriverNamePromptSkipped() async {
+    final settings = await loadSettings();
+    if (settings.containsKey('driverNamePromptSkipped') && settings['driverNamePromptSkipped'] is bool) {
+      return settings['driverNamePromptSkipped'] as bool;
+    }
+    return false;
+  }
 }

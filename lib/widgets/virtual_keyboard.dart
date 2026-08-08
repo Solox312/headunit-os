@@ -94,14 +94,7 @@ class _VirtualKeyboardState extends State<VirtualKeyboard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "Touchscreen Keyboard",
-                style: GoogleFonts.spaceGrotesk(
-                  color: AutomotiveColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              const SizedBox.shrink(),
               IconButton(
                 icon: const Icon(Icons.keyboard_hide_rounded, color: AutomotiveColors.electricCyan, size: 22),
                 onPressed: widget.onClose,

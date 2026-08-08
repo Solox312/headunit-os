@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/nav_dock.dart';
-import '../widgets/virtual_keyboard.dart';
 import '../providers/display_provider.dart';
-import '../providers/keyboard_provider.dart';
 import 'dashboard_screen.dart';
 import 'projection_screen.dart';
 import 'media_screen.dart';
@@ -26,80 +24,60 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       builder: (context, display, child) {
         final double dimOpacity = (1.0 - display.brightness).clamp(0.0, 0.85);
 
-        return Consumer<KeyboardProvider>(
-          builder: (context, kb, child) {
-            return Stack(
-              children: [
-                Scaffold(
-                  backgroundColor: const Color(0xFF090A0F),
-                  body: Row(
-                    children: [
-                      // Left Fixed Navigation Dock
-                      NavDock(
-                        selectedIndex: _selectedIndex,
-                        onDestinationSelected: (index) {
-                          setState(() {
-                            _selectedIndex = index;
-                          });
-                        },
-                      ),
+        return Stack(
+          children: [
+            Scaffold(
+              backgroundColor: const Color(0xFF090A0F),
+              body: Row(
+                children: [
+                  // Left Fixed Navigation Dock
+                  NavDock(
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected: (index) {
+                      setState(() {
+                        _selectedIndex = index;
+                      });
+                    },
+                  ),
 
-                      // Main Screen Content View
-                      Expanded(
-                        child: IndexedStack(
-                          index: _selectedIndex,
-                          children: [
-                            DashboardScreen(
-                              onOpenProjection: () {
-                                setState(() {
-                                  _selectedIndex = 1; // Switch to Projection Stream Screen
-                                });
-                              },
-                              onOpenMedia: () {
-                                setState(() {
-                                  _selectedIndex = 2; // Switch to Media Screen
-                                });
-                              },
-                            ),
-                            const ProjectionScreen(),
-                            const MediaScreen(),
-                            const BluetoothScreen(),
-                            const SettingsScreen(),
-                          ],
+                  // Main Screen View Area
+                  Expanded(
+                    child: IndexedStack(
+                      index: _selectedIndex,
+                      children: [
+                        DashboardScreen(
+                          onOpenProjection: () {
+                            setState(() {
+                              _selectedIndex = 1; // Switch to App Connect Screen
+                            });
+                          },
+                          onOpenMedia: () {
+                            setState(() {
+                              _selectedIndex = 2; // Switch to Media Screen
+                            });
+                          },
                         ),
-                      ),
-                    ],
+                        const ProjectionScreen(),
+                        const MediaScreen(),
+                        const BluetoothScreen(),
+                        const SettingsScreen(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Global Screen Brightness Dimming Overlay
+            if (dimOpacity > 0.01)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    color: Colors.black.withOpacity(dimOpacity),
                   ),
                 ),
-
-                // Global Screen Brightness Dimming Overlay
-                if (dimOpacity > 0.01)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: Container(
-                        color: Colors.black.withOpacity(dimOpacity),
-                      ),
-                    ),
-                  ),
-
-                // On-Screen Virtual Keyboard Layer
-                if (kb.isVisible && kb.controller != null)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: VirtualKeyboard(
-                      controller: kb.controller!,
-                      onSubmitted: () {
-                        if (kb.onSubmitted != null) kb.onSubmitted!();
-                        kb.hide();
-                      },
-                      onClose: () => kb.hide(),
-                    ),
-                  ),
-              ],
-            );
-          },
+              ),
+          ],
         );
       },
     );

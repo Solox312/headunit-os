@@ -9,6 +9,7 @@ import 'providers/bluetooth_provider.dart';
 import 'providers/fm_transmitter_provider.dart';
 import 'providers/display_provider.dart';
 import 'providers/keyboard_provider.dart';
+import 'widgets/virtual_keyboard.dart';
 import 'screens/splash_screen.dart';
 
 class RpiHeadunitApp extends StatelessWidget {
@@ -32,6 +33,34 @@ class RpiHeadunitApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AutomotiveTheme.darkTheme,
         home: const SplashScreen(),
+        builder: (context, child) {
+          return Stack(
+            children: [
+              if (child != null) child,
+              Consumer<KeyboardProvider>(
+                builder: (context, kb, _) {
+                  if (!kb.isVisible || kb.controller == null) return const SizedBox.shrink();
+                  return Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: VirtualKeyboard(
+                        controller: kb.controller!,
+                        onSubmitted: () {
+                          if (kb.onSubmitted != null) kb.onSubmitted!();
+                          kb.hide();
+                        },
+                        onClose: () => kb.hide(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          );
+        },
       ),
     );
   }

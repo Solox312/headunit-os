@@ -5,7 +5,6 @@ import '../theme/automotive_colors.dart';
 import '../widgets/glass_card.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/wifi_provider.dart';
-import '../providers/bluetooth_provider.dart';
 import '../providers/keyboard_provider.dart';
 import '../services/settings_storage_service.dart';
 import '../models/wifi_network.dart';
@@ -62,6 +61,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
+              alignment: Alignment.topCenter,
+              insetPadding: const EdgeInsets.only(top: 40, left: 24, right: 24),
               backgroundColor: AutomotiveColors.glassPanel,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
