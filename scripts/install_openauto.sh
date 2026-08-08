@@ -74,9 +74,10 @@ cd "$BUILD_DIR"
 if [[ ! -d "aasdk" ]]; then
   git clone --depth=1 https://github.com/f1xpl/aasdk.git
   
-  info "Patching aasdk for Boost 1.70+ compatibility..."
+  info "Patching aasdk for Boost 1.70+ and OpenSSL 3.0 compatibility..."
   find aasdk -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
   sed -i '1s/^/#include <boost\/core\/noncopyable.hpp>\n/' aasdk/include/f1x/aasdk/IO/Promise.hpp
+  sed -i 's/FIPS_mode_set(0);//g' aasdk/src/Transport/SSLWrapper.cpp
 fi
 cd aasdk
 mkdir -p build && cd build
