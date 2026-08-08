@@ -73,6 +73,10 @@ info "Step 2/6 — Building aasdk (Android Auto SDK)..."
 cd "$BUILD_DIR"
 if [[ ! -d "aasdk" ]]; then
   git clone --depth=1 https://github.com/f1xpl/aasdk.git
+  
+  info "Patching aasdk for Boost 1.70+ compatibility..."
+  find aasdk -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
+  sed -i '1s/^/#include <boost\/core\/noncopyable.hpp>\n/' aasdk/include/f1x/aasdk/IO/Promise.hpp
 fi
 cd aasdk
 mkdir -p build && cd build
@@ -89,6 +93,9 @@ info "Step 3/6 — Building openauto..."
 cd "$BUILD_DIR"
 if [[ ! -d "openauto" ]]; then
   git clone --depth=1 https://github.com/f1xpl/openauto.git
+  
+  info "Patching openauto for Boost 1.70+ compatibility..."
+  find openauto -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
 fi
 cd openauto
 mkdir -p build && cd build
