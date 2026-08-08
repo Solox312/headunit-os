@@ -3,15 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/automotive_colors.dart';
 import '../widgets/glass_card.dart';
-import '../providers/projection_provider.dart';
 import '../providers/wifi_provider.dart';
 import '../providers/bluetooth_provider.dart';
 import '../providers/fm_transmitter_provider.dart';
 import '../providers/display_provider.dart';
 import '../providers/keyboard_provider.dart';
-import '../services/fm_transmitter_service.dart';
 import '../services/system_info_service.dart';
-import '../models/projection_state.dart';
 import '../models/wifi_network.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -22,74 +19,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  double _brightness = 0.85;
-  bool _wirelessHotspot = true;
-  bool _autoConnect = true;
   String _audioOutputTarget = "AUX Cable / 3.5mm DAC";
-
-  void _showAudioOutputDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AutomotiveColors.glassPanel,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: const BorderSide(color: AutomotiveColors.stroke, width: 1.0),
-          ),
-          title: Text(
-            "Select Audio Output Target",
-            style: GoogleFonts.spaceGrotesk(color: AutomotiveColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildAudioTargetOption("AUX Cable / 3.5mm DAC", Icons.headphones_rounded, "Plugged into Car AUX Input Port (Ground Loop Isolated)"),
-              _buildAudioTargetOption("Car Bluetooth Stereo (A2DP)", Icons.bluetooth_audio_rounded, "Wireless stream to Car's Factory Bluetooth"),
-              _buildAudioTargetOption("FM Transmitter (88.3 MHz)", Icons.radio_rounded, "Broadcast to Car's FM Radio Frequency"),
-              _buildAudioTargetOption("HDMI Display Speakers", Icons.tv_rounded, "Built-in monitor speakers"),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                "Close",
-                style: GoogleFonts.inter(color: AutomotiveColors.electricCyan, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildAudioTargetOption(String target, IconData icon, String subtitle) {
-    final bool isSelected = _audioOutputTarget == target;
-
-    return ListTile(
-      leading: Icon(icon, color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.textSecondary),
-      title: Text(
-        target,
-        style: GoogleFonts.inter(
-          color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.textPrimary,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          fontSize: 14,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11),
-      ),
-      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AutomotiveColors.electricCyan) : null,
-      onTap: () {
-        setState(() {
-          _audioOutputTarget = target;
-        });
-        Navigator.pop(context);
-      },
-    );
-  }
 
   void _showWifiPasswordDialog(BuildContext context, WifiProvider wifi, WifiNetwork network) {
     final passwordController = TextEditingController();
@@ -547,7 +477,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       ),
                                     Switch(
                                       value: wifi.isWifiEnabled,
-                                      activeColor: AutomotiveColors.electricCyan,
+                                      activeTrackColor: AutomotiveColors.electricCyan,
                                       onChanged: (val) => wifi.toggleWifi(val),
                                     ),
                                   ],
@@ -687,7 +617,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ),
                                 Switch(
                                   value: bt.isBluetoothEnabled,
-                                  activeColor: AutomotiveColors.electricCyan,
+                                  activeTrackColor: AutomotiveColors.electricCyan,
                                   onChanged: (val) => bt.togglePower(val),
                                 ),
                               ],

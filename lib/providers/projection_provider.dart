@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/projection_state.dart';
 import '../services/android_auto_engine.dart';
+import '../services/projection_bridge.dart';
 
 class ProjectionProvider extends ChangeNotifier {
   ProjectionState _state = const ProjectionState();
@@ -49,26 +50,18 @@ class ProjectionProvider extends ChangeNotifier {
         connectionType: ConnectionType.none,
       );
     } else if (mode == ProjectionMode.appleCarPlay) {
+      ProjectionBridge().initializeBridge();
       _state = _state.copyWith(
         mode: ProjectionMode.appleCarPlay,
         isConnected: true,
         isStreaming: true,
-        deviceName: "iPhone 15 Pro",
-        connectionType: ConnectionType.wireless,
-        activeApp: "Apple Maps",
+        deviceName: "Apple CarPlay Device",
+        connectionType: ConnectionType.usbDongle,
+        activeApp: "CarPlay Stream",
       );
     } else if (mode == ProjectionMode.androidAuto) {
       // Trigger ADB DHU server connection attempt
       connectAdbDhuServer();
-    } else if (mode == ProjectionMode.simulator) {
-      _state = _state.copyWith(
-        mode: ProjectionMode.simulator,
-        isConnected: true,
-        isStreaming: true,
-        deviceName: "Projection Simulator",
-        connectionType: ConnectionType.simulator,
-        activeApp: "Simulated Projection",
-      );
     }
     notifyListeners();
   }

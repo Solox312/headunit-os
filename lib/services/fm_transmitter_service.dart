@@ -32,7 +32,6 @@ class FmTransmitterService {
     String rdsText = "HeadUnit OS",
   }) async {
     final clampedFreq = frequencyMhz.clamp(87.5, 108.0);
-    final freqKhz = (clampedFreq * 1000).toInt();
 
     if (kDebugMode) {
       print('[FmTransmitterService] Setting FM frequency: ${clampedFreq.toStringAsFixed(1)} MHz ($hardwareType)');

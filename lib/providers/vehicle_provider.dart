@@ -2,16 +2,52 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../models/vehicle_status.dart';
+import '../services/settings_storage_service.dart';
 
 class VehicleProvider extends ChangeNotifier {
   VehicleStatus _status = const VehicleStatus();
+  String _driverName = "Change Me";
   Timer? _liveTelemetryTimer;
   final Random _random = Random();
 
   VehicleStatus get status => _status;
+  String get driverName => _driverName;
+  bool get isDefaultDriverName => _driverName == "Change Me";
 
   VehicleProvider() {
     _startLiveSimulation();
+    _loadStoredDriverName();
+  }
+
+  Future<void> _loadStoredDriverName() async {
+    _driverName = await SettingsStorageService().loadDriverName();
+    notifyListeners();
+  }
+
+  Future<void> updateDriverName(String newName) async {
+    final trimmed = newName.trim();
+    _driverName = trimmed.isEmpty ? "Change Me" : trimmed;
+    await SettingsStorageService().saveDriverName(_driverName);
+    notifyListeners();
+  }
+
+  /// Returns timed greeting based on system hour ("Good Morning", "Good Afternoon", "Good Evening", "Good Night")
+  String getTimedGreetingPrefix() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) {
+      return "Good Morning";
+    } else if (hour >= 12 && hour < 17) {
+      return "Good Afternoon";
+    } else if (hour >= 17 && hour < 21) {
+      return "Good Evening";
+    } else {
+      return "Good Night";
+    }
+  }
+
+  /// Returns full greeting string (e.g. "Good Morning, Change Me" or "Good Afternoon, Carl")
+  String getTimedGreeting() {
+    return "${getTimedGreetingPrefix()}, $_driverName";
   }
 
   void _startLiveSimulation() {

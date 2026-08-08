@@ -8,6 +8,8 @@ import '../widgets/glass_card.dart';
 import '../providers/media_provider.dart';
 import '../providers/projection_provider.dart';
 import '../providers/wifi_provider.dart';
+import '../providers/vehicle_provider.dart';
+import '../providers/keyboard_provider.dart';
 import '../models/projection_state.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -34,6 +36,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _updateTime();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateTime());
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final vehicle = context.read<VehicleProvider>();
+      if (vehicle.isDefaultDriverName) {
+        _showEditDriverNameDialog(context, vehicle);
+      }
+    });
   }
 
   void _updateTime() {
@@ -92,9 +102,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           borderRadius: BorderRadius.circular(14),
                                           border: Border.all(color: AutomotiveColors.stroke, width: 1.0),
                                         ),
-                                        child: Icon(
-                                          isConnected ? Icons.wb_sunny_rounded : Icons.directions_car_filled_rounded,
-                                          color: isConnected ? AutomotiveColors.orangeAccent : AutomotiveColors.electricCyan,
+                                        child: const Icon(
+                                          Icons.directions_car_filled_rounded,
+                                          color: AutomotiveColors.electricCyan,
                                           size: 24,
                                         ),
                                       ),
@@ -104,7 +114,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              isConnected ? "72°F Sunny" : "HeadUnit OS",
+                                              "HeadUnit OS",
                                               style: GoogleFonts.spaceGrotesk(
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
@@ -112,7 +122,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                               ),
                                             ),
                                             Text(
-                                              isConnected ? "Low 64°F • High 78°F" : "System Online • Connect Wi-Fi for Weather",
+                                              isConnected ? "System Online • $ssid" : "System Online • Vehicle Standby",
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: GoogleFonts.jetBrainsMono(
@@ -179,7 +189,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   color: AutomotiveColors.electricCyan,
                                 ),
                               ),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 12),
+                              // Timed Greeting & Driver Name Badge
+                              Consumer<VehicleProvider>(
+                                builder: (context, vehicle, child) {
+                                  final bool isDefaultName = vehicle.isDefaultDriverName;
+                                  return InkWell(
+                                    onTap: () => _showEditDriverNameDialog(context, vehicle),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: isDefaultName
+                                            ? AutomotiveColors.orangeAccent.withAlpha(25)
+                                            : AutomotiveColors.electricCyan.withAlpha(20),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: isDefaultName
+                                              ? AutomotiveColors.orangeAccent.withAlpha(120)
+                                              : AutomotiveColors.electricCyan.withAlpha(80),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            isDefaultName ? Icons.edit_note_rounded : Icons.person_rounded,
+                                            color: isDefaultName ? AutomotiveColors.orangeAccent : AutomotiveColors.electricCyan,
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            vehicle.getTimedGreeting(),
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: isDefaultName ? AutomotiveColors.orangeAccent : AutomotiveColors.textPrimary,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Icon(
+                                            Icons.edit_outlined,
+                                            size: 13,
+                                            color: isDefaultName ? AutomotiveColors.orangeAccent : AutomotiveColors.textSecondary,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 16),
                               const Divider(color: AutomotiveColors.strokeSoft),
                               const SizedBox(height: 12),
                               // Quick App Launchers
@@ -483,6 +543,102 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showEditDriverNameDialog(BuildContext context, VehicleProvider vehicle) {
+    final nameController = TextEditingController(
+      text: vehicle.isDefaultDriverName ? "" : vehicle.driverName,
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AutomotiveColors.glassPanel,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AutomotiveColors.stroke, width: 1.0),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.person_rounded, color: AutomotiveColors.electricCyan),
+              const SizedBox(width: 10),
+              Text(
+                "Driver Profile Name",
+                style: GoogleFonts.spaceGrotesk(
+                  color: AutomotiveColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Enter your name to personalize your vehicle dashboard greeting:",
+                style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: nameController,
+                autofocus: true,
+                style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 15),
+                onTap: () {
+                  context.read<KeyboardProvider>().show(nameController);
+                },
+                decoration: InputDecoration(
+                  hintText: "Enter your name...",
+                  hintStyle: GoogleFonts.inter(color: AutomotiveColors.textMuted),
+                  filled: true,
+                  fillColor: AutomotiveColors.stroke,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AutomotiveColors.electricCyan),
+                  ),
+                  prefixIcon: IconButton(
+                    icon: const Icon(Icons.keyboard_rounded, color: AutomotiveColors.electricCyan),
+                    onPressed: () {
+                      context.read<KeyboardProvider>().show(nameController);
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                context.read<KeyboardProvider>().hide();
+                Navigator.pop(context);
+              },
+              child: Text(
+                "Cancel",
+                style: GoogleFonts.inter(color: AutomotiveColors.textSecondary),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AutomotiveColors.electricCyan,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                context.read<KeyboardProvider>().hide();
+                vehicle.updateDriverName(nameController.text);
+                Navigator.pop(context);
+              },
+              child: Text(
+                "Save Name",
+                style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

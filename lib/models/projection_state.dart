@@ -2,7 +2,6 @@ enum ProjectionMode {
   disconnected,
   appleCarPlay,
   androidAuto,
-  simulator,
 }
 
 enum ConnectionType {
@@ -11,7 +10,6 @@ enum ConnectionType {
   usbDongle,
   wired,
   adbDhu,
-  simulator,
 }
 
 enum ProjectionEngineType {
@@ -32,15 +30,15 @@ class ProjectionState {
   final int fps;
 
   const ProjectionState({
-    this.mode = ProjectionMode.appleCarPlay,
-    this.connectionType = ConnectionType.wireless,
+    this.mode = ProjectionMode.disconnected,
+    this.connectionType = ConnectionType.none,
     this.engineType = ProjectionEngineType.autoDetect,
-    this.deviceName = "iPhone 15 Pro",
-    this.phoneBatteryLevel = 88,
-    this.isConnected = true,
-    this.isStreaming = true,
-    this.activeApp = "Maps",
-    this.fps = 60,
+    this.deviceName = "",
+    this.phoneBatteryLevel = 0,
+    this.isConnected = false,
+    this.isStreaming = false,
+    this.activeApp = "",
+    this.fps = 0,
   });
 
   ProjectionState copyWith({

@@ -124,7 +124,7 @@ class BluetoothScreen extends StatelessWidget {
                                       ),
                                     Switch(
                                       value: bt.isBluetoothEnabled,
-                                      activeColor: AutomotiveColors.electricCyan,
+                                      activeTrackColor: AutomotiveColors.electricCyan,
                                       onChanged: (val) => bt.togglePower(val),
                                     ),
                                   ],
@@ -137,11 +137,11 @@ class BluetoothScreen extends StatelessWidget {
                                 contentPadding: EdgeInsets.zero,
                                 title: Text("Make Discoverable", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14)),
                                 subtitle: Text(
-                                  bt.isDiscoverable ? "Visible as 'RPi-HeadUnit' for Wireless CarPlay & AA" : "Hidden from nearby devices",
+                                  bt.isDiscoverable ? "Visible as 'HeadUnit OS' for Wireless CarPlay & AA" : "Hidden from nearby devices",
                                   style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11),
                                 ),
                                 value: bt.isDiscoverable,
-                                activeThumbColor: AutomotiveColors.electricCyan,
+                                activeTrackColor: AutomotiveColors.electricCyan,
                                 onChanged: (val) => bt.toggleDiscoverable(val),
                               ),
                             ],

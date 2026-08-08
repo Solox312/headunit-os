@@ -10,7 +10,6 @@ import 'providers/fm_transmitter_provider.dart';
 import 'providers/display_provider.dart';
 import 'providers/keyboard_provider.dart';
 import 'screens/splash_screen.dart';
-import 'screens/main_navigation_screen.dart';
 
 class RpiHeadunitApp extends StatelessWidget {
   const RpiHeadunitApp({super.key});

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/automotive_colors.dart';
+import '../services/settings_storage_service.dart';
+import 'onboarding_screen.dart';
 import 'main_navigation_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -83,9 +85,14 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (widget.onComplete != null) {
       widget.onComplete!();
     } else {
+      final bool onboardingCompleted = await SettingsStorageService().loadOnboardingCompleted();
+      if (!mounted) return;
+
+      final targetWidget = onboardingCompleted ? const MainNavigationScreen() : const OnboardingScreen();
+
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (context, anim, secondaryAnim) => const MainNavigationScreen(),
+          pageBuilder: (context, anim, secondaryAnim) => targetWidget,
           transitionsBuilder: (context, anim, secondaryAnim, child) {
             return FadeTransition(opacity: anim, child: child);
           },

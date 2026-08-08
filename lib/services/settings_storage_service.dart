@@ -89,4 +89,33 @@ class SettingsStorageService {
     }
     return 0.85;
   }
+
+  /// Helper to save driver profile name.
+  Future<void> saveDriverName(String name) async {
+    await saveSettings({'driverName': name});
+  }
+
+  /// Helper to read stored driver profile name (defaults to 'Change Me').
+  Future<String> loadDriverName() async {
+    final settings = await loadSettings();
+    if (settings.containsKey('driverName') && settings['driverName'] is String) {
+      final name = (settings['driverName'] as String).trim();
+      if (name.isNotEmpty) return name;
+    }
+    return 'Change Me';
+  }
+
+  /// Helper to save onboarding completion state.
+  Future<void> saveOnboardingCompleted(bool completed) async {
+    await saveSettings({'onboardingCompleted': completed});
+  }
+
+  /// Helper to read stored onboarding completion state (defaults to false).
+  Future<bool> loadOnboardingCompleted() async {
+    final settings = await loadSettings();
+    if (settings.containsKey('onboardingCompleted') && settings['onboardingCompleted'] is bool) {
+      return settings['onboardingCompleted'] as bool;
+    }
+    return false;
+  }
 }

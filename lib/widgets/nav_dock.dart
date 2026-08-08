@@ -178,7 +178,7 @@ class _NavDockState extends State<NavDock> {
                     icon: Icons.layers_rounded,
                     label: projection.state.mode == ProjectionMode.appleCarPlay
                         ? "CarPlay"
-                        : (projection.state.mode == ProjectionMode.androidAuto ? "AA Stream" : "Projection"),
+                        : (projection.state.mode == ProjectionMode.androidAuto ? "AA Stream" : "App Connect"),
                     badgeColor: projection.state.mode == ProjectionMode.appleCarPlay
                         ? AutomotiveColors.carPlayColor
                         : (projection.state.mode == ProjectionMode.androidAuto

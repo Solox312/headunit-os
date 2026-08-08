@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/automotive_colors.dart';
 import '../models/projection_state.dart';
 import '../providers/projection_provider.dart';
-import '../widgets/projection_simulator_canvas.dart';
 
 class ProjectionScreen extends StatelessWidget {
   const ProjectionScreen({super.key});
@@ -20,11 +19,11 @@ class ProjectionScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Top Control Bar: Mode Toggle (Apple CarPlay vs Android Auto vs Simulator vs Disconnect)
+            // Top Control Bar: Mode Toggle (Apple CarPlay vs Android Auto vs Disconnect)
             Row(
               children: [
                 Text(
-                  "PROJECTION STREAM",
+                  "APP CONNECT",
                   style: GoogleFonts.spaceGrotesk(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -49,13 +48,17 @@ class ProjectionScreen extends StatelessWidget {
                   icon: Icons.phone_android_rounded,
                 ),
                 const SizedBox(width: 8),
-                _buildModeChip(
-                  context,
-                  label: "Simulator Mode",
-                  mode: ProjectionMode.simulator,
-                  activeColor: AutomotiveColors.electricCyan,
-                  icon: Icons.computer_rounded,
-                ),
+                if (mode != ProjectionMode.disconnected)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.power_settings_new_rounded, size: 16),
+                    label: Text("Disconnect", style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AutomotiveColors.redAccent,
+                      side: const BorderSide(color: AutomotiveColors.redAccent),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => projection.switchMode(ProjectionMode.disconnected),
+                  ),
               ],
             ),
             const SizedBox(height: 12),
@@ -64,7 +67,7 @@ class ProjectionScreen extends StatelessWidget {
             Expanded(
               child: mode == ProjectionMode.disconnected
                   ? _buildDisconnectedState(context, projection)
-                  : const ProjectionSimulatorCanvas(),
+                  : _buildStreamingViewport(context, projection),
             ),
           ],
         ),
@@ -124,44 +127,74 @@ class ProjectionScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              "Plug in your phone via USB Dongle, connect via Wireless Hotspot, or start Head Unit Server on your phone.",
+              "Plug in your phone via USB Dongle (Carlinkit CPC200),\nconnect via 5GHz Wi-Fi Hotspot, or start Head Unit Server on your phone.",
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(fontSize: 14, color: AutomotiveColors.textSecondary),
             ),
             const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.adb_rounded),
-                  label: Text("Connect ADB DHU (Port 5277)", style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AutomotiveColors.androidAutoColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () async {
-                    await projection.connectAdbDhuServer();
-                  },
-                ),
-                const SizedBox(width: 14),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: Text("Launch Simulator", style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AutomotiveColors.electricCyan,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () {
-                    projection.switchMode(ProjectionMode.simulator);
-                  },
-                ),
-              ],
+            ElevatedButton.icon(
+              icon: const Icon(Icons.adb_rounded),
+              label: Text("Connect ADB DHU Server (Port 5277)", style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AutomotiveColors.androidAutoColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                await projection.connectAdbDhuServer();
+              },
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStreamingViewport(BuildContext context, ProjectionProvider projection) {
+    final isCarPlay = projection.state.mode == ProjectionMode.appleCarPlay;
+    final accentColor = isCarPlay ? AutomotiveColors.carPlayColor : AutomotiveColors.androidAutoColor;
+
+    return GestureDetector(
+      onTapDown: (details) {
+        final RenderBox box = context.findRenderObject() as RenderBox;
+        final localPos = box.globalToLocal(details.globalPosition);
+        projection.handleTouchEvent(localPos.dx, localPos.dy, "down");
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: accentColor, width: 2.0),
+          boxShadow: [
+            BoxShadow(
+              color: accentColor.withOpacity(0.3),
+              blurRadius: 16,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isCarPlay ? Icons.phone_iphone_rounded : Icons.android_rounded,
+                size: 64,
+                color: accentColor,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                isCarPlay ? "Apple CarPlay Active Stream" : "Android Auto Active Stream",
+                style: GoogleFonts.spaceGrotesk(fontSize: 20, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Device: ${projection.state.deviceName} • 60 FPS H.264 Video Stream",
+                style: GoogleFonts.inter(fontSize: 13, color: AutomotiveColors.textSecondary),
+              ),
+            ],
+          ),
         ),
       ),
     );

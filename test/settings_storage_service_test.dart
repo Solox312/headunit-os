@@ -12,5 +12,13 @@ void main() {
       final loaded = await storage.loadBrightness();
       expect(loaded, equals(0.45));
     });
+
+    test('saveDriverName and loadDriverName persists driver name', () async {
+      final storage = SettingsStorageService();
+      await storage.saveDriverName('Carl');
+
+      final loaded = await storage.loadDriverName();
+      expect(loaded, equals('Carl'));
+    });
   });
 }
