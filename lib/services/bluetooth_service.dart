@@ -36,14 +36,16 @@ class BluetoothService {
       // 1. Unblock Bluetooth radio via rfkill (works on Linux Mint & RPi OS)
       await Process.run('rfkill', ['unblock', 'bluetooth']);
 
-      // 2. Turn power on and set default agent
+      // 2. Turn power on, set adapter name to "HeadUnit OS", and set default agent
       await Process.run('bluetoothctl', ['power', 'on']);
+      await Process.run('bluetoothctl', ['system-alias', 'HeadUnit OS']);
+      await Process.run('hciconfig', ['hci0', 'name', 'HeadUnit OS']);
       await Process.run('bluetoothctl', ['agent', 'NoInputNoOutput']);
       await Process.run('bluetoothctl', ['default-agent']);
       await Process.run('bluetoothctl', ['discoverable', 'on']);
       await Process.run('bluetoothctl', ['pairable', 'on']);
 
-      if (kDebugMode) print('[BluetoothService] Initialized Linux Mint & RPi BlueZ stack.');
+      if (kDebugMode) print('[BluetoothService] Initialized Linux Mint & RPi BlueZ stack with broadcast name "HeadUnit OS".');
       return true;
     } catch (e) {
       if (kDebugMode) print('[BluetoothService] Exception initializing Linux Bluetooth: $e');

@@ -32,7 +32,25 @@ sudo rfkill unblock bluetooth
 bluetoothctl power on
 ```
 
-### Step 2: Set HeadUnit OS as Discoverable & Pairable Receiver
+### Step 2: Set Bluetooth Chip Broadcast Name to "HeadUnit OS"
+
+HeadUnit OS automatically sets the adapter name on boot. To configure the system-wide Bluetooth name persistently in the Linux kernel:
+
+Edit `/etc/bluetooth/main.conf`:
+```ini
+[General]
+Name = HeadUnit OS
+Class = 0x200408
+DiscoverableTimeout = 0
+```
+
+Or via CLI:
+```bash
+bluetoothctl system-alias "HeadUnit OS"
+sudo hciconfig hci0 name "HeadUnit OS"
+```
+
+### Step 3: Set HeadUnit OS as Discoverable & Pairable Receiver
 ```bash
 bluetoothctl discoverable on
 bluetoothctl pairable on
