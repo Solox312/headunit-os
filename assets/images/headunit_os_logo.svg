@@ -1,0 +1,46 @@
+<svg viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3fd0ff"/>
+      <stop offset="55%" stop-color="#4f7dff"/>
+      <stop offset="100%" stop-color="#7a5cff"/>
+    </linearGradient>
+
+    <linearGradient id="ringFade" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3fd0ff" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#7a5cff" stop-opacity="0.15"/>
+    </linearGradient>
+
+    <radialGradient id="bg" cx="50%" cy="42%" r="70%">
+      <stop offset="0%" stop-color="#111b29"/>
+      <stop offset="100%" stop-color="#060a10"/>
+    </radialGradient>
+
+    <filter id="softGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- background plate -->
+  <rect width="600" height="600" rx="120" fill="url(#bg)"/>
+  <rect x="4" y="4" width="592" height="592" rx="116" fill="none" stroke="#1c2a3d" stroke-width="2"/>
+
+  <!-- emblem -->
+  <g transform="translate(300,300)" filter="url(#softGlow)">
+    <circle r="168" fill="none" stroke="#16202f" stroke-width="14"/>
+    <circle r="168" fill="none" stroke="url(#ringFade)" stroke-width="14"
+            stroke-linecap="round" stroke-dasharray="740" stroke-dashoffset="200"
+            transform="rotate(-90)"/>
+
+    <!-- H mark with speed chevron -->
+    <g fill="url(#accent)">
+      <rect x="-82" y="-74" width="26" height="148" rx="6"/>
+      <rect x="56" y="-74" width="26" height="148" rx="6"/>
+      <path d="M -82 -6 L 82 -26 L 82 2 L -82 22 Z"/>
+    </g>
+  </g>
+</svg>

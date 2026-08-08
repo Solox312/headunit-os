@@ -1,3 +1,15 @@
+/// Android Auto wireless connection lifecycle steps.
+enum AAConnectionStep {
+  idle,
+  hotspotCreating,
+  bluetoothDiscoverable,
+  waitingForPhone,
+  tlsHandshake,
+  channelDiscovery,
+  streaming,
+  error,
+}
+
 enum ProjectionMode {
   disconnected,
   appleCarPlay,
@@ -28,6 +40,10 @@ class ProjectionState {
   final bool isStreaming;
   final String activeApp;
   final int fps;
+  final AAConnectionStep connectionStep;
+  final String hotspotSsid;
+  final String wirelessIp;
+  final int signalStrength;
 
   const ProjectionState({
     this.mode = ProjectionMode.disconnected,
@@ -39,6 +55,10 @@ class ProjectionState {
     this.isStreaming = false,
     this.activeApp = "",
     this.fps = 0,
+    this.connectionStep = AAConnectionStep.idle,
+    this.hotspotSsid = "HeadUnit-OS",
+    this.wirelessIp = "",
+    this.signalStrength = 0,
   });
 
   ProjectionState copyWith({
@@ -51,6 +71,10 @@ class ProjectionState {
     bool? isStreaming,
     String? activeApp,
     int? fps,
+    AAConnectionStep? connectionStep,
+    String? hotspotSsid,
+    String? wirelessIp,
+    int? signalStrength,
   }) {
     return ProjectionState(
       mode: mode ?? this.mode,
@@ -62,6 +86,10 @@ class ProjectionState {
       isStreaming: isStreaming ?? this.isStreaming,
       activeApp: activeApp ?? this.activeApp,
       fps: fps ?? this.fps,
+      connectionStep: connectionStep ?? this.connectionStep,
+      hotspotSsid: hotspotSsid ?? this.hotspotSsid,
+      wirelessIp: wirelessIp ?? this.wirelessIp,
+      signalStrength: signalStrength ?? this.signalStrength,
     );
   }
 }

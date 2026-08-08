@@ -27,9 +27,18 @@ class VehicleProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  String _capitalizeName(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return "Change Me";
+    return trimmed.split(RegExp(r'\s+')).map((word) {
+      if (word.isEmpty) return '';
+      if (word.length == 1) return word.toUpperCase();
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
   Future<void> updateDriverName(String newName) async {
-    final trimmed = newName.trim();
-    _driverName = trimmed.isEmpty ? "Change Me" : trimmed;
+    _driverName = _capitalizeName(newName);
     _driverNamePromptSkipped = true;
     await SettingsStorageService().saveDriverName(_driverName);
     await SettingsStorageService().saveDriverNamePromptSkipped(true);
