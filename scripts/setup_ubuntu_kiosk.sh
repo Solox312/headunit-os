@@ -143,7 +143,7 @@ fi
 sudo tee /etc/systemd/system/headunit.service > /dev/null << EOF
 [Unit]
 Description=HeadUnit OS Automotive Touchscreen UI
-After=systemd-user-sessions.service network-online.target sound.target
+After=systemd-user-sessions.service network-online.target sound.target systemd-udevd.service
 Wants=network-online.target
 
 [Service]
@@ -151,9 +151,12 @@ Type=simple
 User=$CURRENT_USER
 Group=$CURRENT_USER
 WorkingDirectory=$PROJECT_DIR
+Environment=XDG_RUNTIME_DIR=/tmp/flutter-pi-runtime
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStartPre=/bin/mkdir -p /tmp/flutter-pi-runtime
 ExecStart=/usr/local/bin/flutter-pi $FLUTTER_PI_FLAGS $ASSETS_PATH
 Restart=always
-RestartSec=1
+RestartSec=2
 StandardOutput=journal
 StandardError=journal
 
@@ -161,10 +164,22 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
+sudo systemctl set-default multi-user.target
 sudo systemctl daemon-reload
 sudo systemctl enable headunit.service
 
-echo -e "${GREEN}✓ Kiosk service enabled.${NC}"
+# Configure TTY1 auto-login so Ubuntu Server boots directly into HeadUnit OS without login prompts
+sudo mkdir -p /etc/systemd/system/getty@tty1.service.d/
+sudo tee /etc/systemd/system/getty@tty1.service.d/override.conf > /dev/null << EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --noissue --autologin $CURRENT_USER %I \$TERM
+Type=idle
+EOF
+
+sudo systemctl daemon-reload
+
+echo -e "${GREEN}✓ Kiosk service & auto-boot enabled.${NC}"
 echo ""
 echo -e "${GREEN}══════════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN} 🎉 HeadUnit OS Ubuntu Kiosk Setup Complete!${NC}"
@@ -173,4 +188,5 @@ echo ""
 echo -e "Starting HeadUnit OS kiosk service now..."
 sudo systemctl restart headunit.service
 echo ""
+echo -e "To test auto-boot on key turn/startup, simply reboot: ${CYAN}sudo reboot${NC}"
 echo -e "To view live logs: ${CYAN}sudo journalctl -u headunit.service -f${NC}"
