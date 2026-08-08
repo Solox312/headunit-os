@@ -28,7 +28,7 @@ echo ""
 echo -e "${CYAN}[1/5] Installing DRM/KMS, Audio, & Network dependencies...${NC}"
 sudo apt update
 sudo apt install -y \
-  git curl wget build-essential cmake pkg-config snapd \
+  git curl wget unzip jq build-essential cmake pkg-config snapd \
   libdrm-dev libgbm-dev libgles2-mesa-dev \
   libsystemd-dev libinput-dev libudev-dev libxkbcommon-dev \
   libasound2-dev pulseaudio libmpv-dev mpv \
@@ -90,15 +90,16 @@ if command -v flutter &> /dev/null; then
   
   if [ -z "$ENGINE_FILE" ]; then
     echo -e "${YELLOW}Downloading matching libflutter_engine.so directly from Google Flutter storage...${NC}"
-    ENGINE_REV=$(cat $(which flutter 2>/dev/null | xargs readlink -f 2>/dev/null | xargs dirname 2>/dev/null | xargs dirname 2>/dev/null)/bin/internal/engine.version 2>/dev/null || echo "")
-    if [ -z "$ENGINE_REV" ]; then
-      ENGINE_REV=$(find "$HOME" "/snap" -name "engine.version" 2>/dev/null | head -n 1 | xargs cat 2>/dev/null || echo "")
+    ENGINE_REV="5a2a6a42cce67f965cf540fcecf616faca624aa1"
+    FOUND_REV=$(cat $(which flutter 2>/dev/null | xargs readlink -f 2>/dev/null | xargs dirname 2>/dev/null | xargs dirname 2>/dev/null)/bin/internal/engine.version 2>/dev/null || echo "")
+    if [ -n "$FOUND_REV" ]; then
+      ENGINE_REV="$FOUND_REV"
     fi
-    if [ -n "$ENGINE_REV" ]; then
-      echo "Engine Revision: $ENGINE_REV"
-      wget -q "https://storage.googleapis.com/flutter_infra_release/flutter/${ENGINE_REV}/linux-x64/linux-x64-embedder.zip" -O /tmp/flutter_embedder.zip || true
-      if [ -f /tmp/flutter_embedder.zip ]; then
-        unzip -o /tmp/flutter_embedder.zip libflutter_engine.so -d /tmp/ 2>/dev/null || true
+    echo "Engine Revision: $ENGINE_REV"
+    curl -sSL "https://storage.googleapis.com/flutter_infra_release/flutter/${ENGINE_REV}/linux-x64/linux-x64-embedder.zip" -o /tmp/flutter_embedder.zip || true
+    if [ -f /tmp/flutter_embedder.zip ]; then
+      unzip -o /tmp/flutter_embedder.zip libflutter_engine.so -d /tmp/ 2>/dev/null || true
+      if [ -f /tmp/libflutter_engine.so ]; then
         ENGINE_FILE="/tmp/libflutter_engine.so"
       fi
     fi
@@ -109,8 +110,9 @@ if command -v flutter &> /dev/null; then
     sudo cp "$ENGINE_FILE" "/usr/local/lib/libflutter_engine.so"
     sudo cp "$ENGINE_FILE" "/usr/lib/libflutter_engine.so" 2>/dev/null || true
     sudo ldconfig
+    echo -e "${GREEN}✓ libflutter_engine.so installed successfully to /usr/local/lib.${NC}"
   else
-    echo -e "${YELLOW}⚠️  Could not locate libflutter_engine.so automatically.${NC}"
+    echo -e "${RED}❌ Could not locate or download libflutter_engine.so.${NC}"
   fi
 
   echo -e "${GREEN}✓ Flutter assets bundle, icudtl.dat, & libflutter_engine.so prepared successfully.${NC}"
