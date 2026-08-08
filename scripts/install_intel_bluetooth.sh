@@ -17,11 +17,23 @@ echo -e "${CYAN}╚════════════════════�
 echo ""
 
 # 1. Install packages
-echo -e "${CYAN}[1/3] Installing linux-firmware & BlueZ stack...${NC}"
+echo -e "${CYAN}[1/3] Installing linux-firmware, pulseaudio-module-bluetooth, & BlueZ stack...${NC}"
 sudo apt update
-sudo apt install -y linux-firmware bluetooth bluez rfkill git
+sudo apt install -y linux-firmware bluetooth bluez rfkill git pulseaudio-module-bluetooth
 echo -e "${GREEN}✓ Firmware packages installed.${NC}"
 echo ""
+
+# Configure Automotive Car Stereo Device Class (0x200408) in BlueZ
+echo -e "${CYAN}Configuring Automotive Car Stereo Bluetooth Profile (Class = 0x200408)...${NC}"
+sudo tee -a /etc/bluetooth/main.conf > /dev/null << 'EOF'
+
+[General]
+Name = HeadUnit OS
+Class = 0x200408
+DiscoverableTimeout = 0
+PairableTimeout = 0
+AutoConnect = true
+EOF
 
 # 2. Copy latest Intel Bluetooth firmware
 echo -e "${CYAN}[2/3] Fetching latest Intel Bluetooth firmware (ibt-*)...${NC}"
