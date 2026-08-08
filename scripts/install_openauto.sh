@@ -65,8 +65,7 @@ sudo apt-get install -y --no-install-recommends \
   librtaudio-dev \
   qtbase5-dev qtmultimedia5-dev \
   libqt5bluetooth5-dev \
-  libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
-  2>/dev/null
+  libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
 success "Build dependencies installed."
 
 # ── 2. Build aasdk ────────────────────────────────────────────────────────────
