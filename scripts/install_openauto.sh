@@ -83,6 +83,7 @@ cd aasdk
 mkdir -p build && cd build
 cmake .. \
   -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_CXX_FLAGS="-fpermissive" \
   -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX"
 make -j"$(nproc)"
 sudo make install
@@ -102,6 +103,7 @@ cd openauto
 mkdir -p build && cd build
 cmake .. \
   -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_CXX_FLAGS="-fpermissive" \
   -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
   -DAASDK_INCLUDE_DIRS="$INSTALL_PREFIX/include" \
   -DAASDK_LIBRARIES="$INSTALL_PREFIX/lib/libaasdk.so"
