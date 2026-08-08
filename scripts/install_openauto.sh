@@ -115,11 +115,19 @@ success "aasdk installed to $INSTALL_PREFIX."
 # ── 3. Build openauto ─────────────────────────────────────────────────────────
 info "Step 3/6 — Building openauto..."
 cd "$BUILD_DIR"
-rm -rf openauto
-git clone --depth=1 https://github.com/f1xpl/openauto.git
-
-info "Patching openauto for Boost 1.70+ compatibility..."
-find openauto -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
+if [[ ! -d "openauto" ]]; then
+  git clone --depth=1 https://github.com/f1xpl/openauto.git
+  
+  info "Patching openauto for Boost 1.70+ and aasdk API compatibility..."
+  find openauto -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
+  
+  # Implement missing pure virtual onAVChannelStopIndication in event handlers
+  sed -i '/onAVChannelSetupResponseMessage/a \    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication&) override {}' openauto/include/f1x/openauto/autoapp/Service/VideoService.hpp 2>/dev/null || true
+  sed -i '/onAVChannelSetupResponseMessage/a \    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication&) override {}' openauto/include/f1x/openauto/autoapp/Service/MediaAudioService.hpp 2>/dev/null || true
+  sed -i '/onAVChannelSetupResponseMessage/a \    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication&) override {}' openauto/include/f1x/openauto/autoapp/Service/SpeechAudioService.hpp 2>/dev/null || true
+  sed -i '/onAVChannelSetupResponseMessage/a \    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication&) override {}' openauto/include/f1x/openauto/autoapp/Service/SystemAudioService.hpp 2>/dev/null || true
+  sed -i '/onAVChannelSetupResponseMessage/a \    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication&) override {}' openauto/include/f1x/openauto/autoapp/Service/AudioInputService.hpp 2>/dev/null || true
+fi
 cd openauto
 mkdir -p build && cd build
 cmake .. \
