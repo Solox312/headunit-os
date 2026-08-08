@@ -10,72 +10,6 @@ class MediaProvider extends ChangeNotifier {
   bool get hasMedia => _mediaItem.hasMedia;
   AudioSourceMode get currentMode => _mediaItem.audioMode;
 
-  final List<MediaItem> _bluetoothPlaylist = [
-    const MediaItem(
-      hasMedia: true,
-      title: "Blinding Lights",
-      artist: "The Weeknd",
-      album: "After Hours",
-      coverUrl: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&q=80",
-      duration: Duration(minutes: 3, seconds: 20),
-      source: "Bluetooth Audio",
-      audioMode: AudioSourceMode.bluetooth,
-      isPlaying: true,
-    ),
-    const MediaItem(
-      hasMedia: true,
-      title: "Starboy",
-      artist: "The Weeknd ft. Daft Punk",
-      album: "Starboy",
-      coverUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80",
-      duration: Duration(minutes: 3, seconds: 50),
-      source: "Bluetooth Audio",
-      audioMode: AudioSourceMode.bluetooth,
-      isPlaying: true,
-    ),
-  ];
-
-  final List<MediaItem> _projectionPlaylist = [
-    const MediaItem(
-      hasMedia: true,
-      title: "Midnight City",
-      artist: "M83",
-      album: "Hurry Up, We're Dreaming",
-      coverUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80",
-      duration: Duration(minutes: 4, seconds: 03),
-      source: "CarPlay / Android Auto",
-      audioMode: AudioSourceMode.projectionCarPlayAA,
-      isPlaying: true,
-    ),
-    const MediaItem(
-      hasMedia: true,
-      title: "Get Lucky",
-      artist: "Daft Punk ft. Pharrell",
-      album: "Random Access Memories",
-      coverUrl: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80",
-      duration: Duration(minutes: 4, seconds: 08),
-      source: "CarPlay / Android Auto",
-      audioMode: AudioSourceMode.projectionCarPlayAA,
-      isPlaying: true,
-    ),
-  ];
-
-  final List<MediaItem> _auxFmPlaylist = [
-    const MediaItem(
-      hasMedia: true,
-      title: "88.3 FM Radio Live Stream",
-      artist: "FM Radio Broadcaster",
-      album: "88.3 MHz HD Audio",
-      coverUrl: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=500&q=80",
-      duration: Duration(hours: 1),
-      source: "AUX / FM Radio (88.3 MHz)",
-      audioMode: AudioSourceMode.auxFm,
-      isPlaying: true,
-    ),
-  ];
-
-  int _currentIndex = 0;
-
   MediaProvider() {
     _startPlaybackTimer();
   }
@@ -88,38 +22,50 @@ class MediaProvider extends ChangeNotifier {
             position: _mediaItem.position + const Duration(seconds: 1),
           );
           notifyListeners();
-        } else {
-          nextTrack();
         }
       }
     });
   }
 
   void setAudioMode(AudioSourceMode mode) {
-    _currentIndex = 0;
-    if (mode == AudioSourceMode.bluetooth) {
-      _mediaItem = _bluetoothPlaylist[0];
-    } else if (mode == AudioSourceMode.projectionCarPlayAA) {
-      _mediaItem = _projectionPlaylist[0];
-    } else if (mode == AudioSourceMode.auxFm) {
-      _mediaItem = _auxFmPlaylist[0];
+    if (mode == AudioSourceMode.auxFm) {
+      _mediaItem = const MediaItem(
+        hasMedia: true,
+        title: "AUX / FM Radio Stream",
+        artist: "Analog Audio Input",
+        album: "Live Audio",
+        duration: Duration(hours: 1),
+        source: "AUX / FM Radio",
+        audioMode: AudioSourceMode.auxFm,
+        isPlaying: true,
+      );
+    } else {
+      _mediaItem = MediaItem.none(audioMode: mode);
     }
     notifyListeners();
   }
 
-  List<MediaItem> _getActivePlaylist() {
-    if (_mediaItem.audioMode == AudioSourceMode.bluetooth) {
-      return _bluetoothPlaylist;
-    } else if (_mediaItem.audioMode == AudioSourceMode.projectionCarPlayAA) {
-      return _projectionPlaylist;
-    } else {
-      return _auxFmPlaylist;
-    }
-  }
-
-  void playDefaultTrack() {
-    final playlist = _getActivePlaylist();
-    _mediaItem = playlist[_currentIndex].copyWith(isPlaying: true);
+  void updateTrackInfo({
+    required String title,
+    required String artist,
+    String album = "",
+    String coverUrl = "",
+    Duration duration = Duration.zero,
+    String source = "Connected Device",
+  }) {
+    _mediaItem = MediaItem(
+      hasMedia: true,
+      title: title,
+      artist: artist,
+      album: album,
+      coverUrl: coverUrl,
+      duration: duration,
+      position: Duration.zero,
+      isPlaying: true,
+      volume: _mediaItem.volume,
+      source: source,
+      audioMode: _mediaItem.audioMode,
+    );
     notifyListeners();
   }
 
@@ -129,34 +75,19 @@ class MediaProvider extends ChangeNotifier {
   }
 
   void togglePlayPause() {
-    if (!_mediaItem.hasMedia) {
-      playDefaultTrack();
-      return;
-    }
+    if (!_mediaItem.hasMedia) return;
     _mediaItem = _mediaItem.copyWith(isPlaying: !_mediaItem.isPlaying);
     notifyListeners();
   }
 
   void nextTrack() {
-    final playlist = _getActivePlaylist();
-    if (!_mediaItem.hasMedia) {
-      playDefaultTrack();
-      return;
-    }
-    _currentIndex = (_currentIndex + 1) % playlist.length;
-    _mediaItem = playlist[_currentIndex].copyWith(isPlaying: true);
-    notifyListeners();
+    if (!_mediaItem.hasMedia) return;
+    // Skip to next track command sent to Bluetooth / Projection receiver
   }
 
   void previousTrack() {
-    final playlist = _getActivePlaylist();
-    if (!_mediaItem.hasMedia) {
-      playDefaultTrack();
-      return;
-    }
-    _currentIndex = (_currentIndex - 1 + playlist.length) % playlist.length;
-    _mediaItem = playlist[_currentIndex].copyWith(isPlaying: true);
-    notifyListeners();
+    if (!_mediaItem.hasMedia) return;
+    // Skip to previous track command sent to Bluetooth / Projection receiver
   }
 
   void seek(Duration newPosition) {

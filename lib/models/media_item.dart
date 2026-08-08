@@ -14,27 +14,27 @@ class MediaItem {
   final Duration position;
   final bool isPlaying;
   final double volume; // 0.0 to 1.0
-  final String source; // "Spotify", "CarPlay / AA", "Bluetooth", "Aux / FM", "None"
+  final String source; // "CarPlay / AA", "Bluetooth", "Aux / FM", "None"
   final AudioSourceMode audioMode;
 
   const MediaItem({
-    this.hasMedia = true,
-    this.title = "Blinding Lights",
-    this.artist = "The Weeknd",
-    this.album = "After Hours",
-    this.coverUrl = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&q=80",
-    this.duration = const Duration(minutes: 3, seconds: 20),
-    this.position = const Duration(minutes: 1, seconds: 12),
-    this.isPlaying = true,
+    this.hasMedia = false,
+    this.title = "No Track Playing",
+    this.artist = "No Active Audio Source",
+    this.album = "",
+    this.coverUrl = "",
+    this.duration = Duration.zero,
+    this.position = Duration.zero,
+    this.isPlaying = false,
     this.volume = 0.75,
-    this.source = "Bluetooth",
+    this.source = "None",
     this.audioMode = AudioSourceMode.bluetooth,
   });
 
   const MediaItem.none({this.audioMode = AudioSourceMode.bluetooth})
       : hasMedia = false,
-        title = "No Music Playing",
-        artist = "Select a mode to start audio playback",
+        title = "No Track Playing",
+        artist = "Select an audio source to begin playback",
         album = "Idle",
         coverUrl = "",
         duration = Duration.zero,

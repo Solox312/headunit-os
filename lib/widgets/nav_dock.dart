@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'dart:async';
 import '../theme/automotive_colors.dart';
 import '../providers/projection_provider.dart';
+import '../providers/wifi_provider.dart';
+import '../providers/bluetooth_provider.dart';
 import '../models/projection_state.dart';
 
 class NavDock extends StatefulWidget {
@@ -108,9 +110,57 @@ class _NavDockState extends State<NavDock> {
               color: AutomotiveColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 6),
+          // Status Indicators Row (Wi-Fi & Bluetooth)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Consumer<WifiProvider>(
+                builder: (context, wifi, child) {
+                  final bool isConnected = wifi.isConnected;
+                  return Tooltip(
+                    message: isConnected ? "Wi-Fi Connected: ${wifi.connectedSsid}" : "Wi-Fi Disconnected",
+                    child: InkWell(
+                      onTap: () => widget.onDestinationSelected(4), // Settings
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        child: Icon(
+                          isConnected ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                          color: isConnected ? AutomotiveColors.nativeGreen : AutomotiveColors.textMuted,
+                          size: 14,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 4),
+              Consumer<BluetoothProvider>(
+                builder: (context, bt, child) {
+                  final bool isConnected = bt.connectedDevice != null;
+                  return Tooltip(
+                    message: isConnected ? "Bluetooth Connected: ${bt.connectedDevice!.name}" : "Bluetooth Disconnected",
+                    child: InkWell(
+                      onTap: () => widget.onDestinationSelected(3), // Bluetooth Screen
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        child: Icon(
+                          isConnected ? Icons.bluetooth_connected_rounded : Icons.bluetooth_disabled_rounded,
+                          color: isConnected ? AutomotiveColors.electricCyan : AutomotiveColors.textMuted,
+                          size: 14,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           const Divider(color: AutomotiveColors.strokeSoft, height: 1, indent: 14, endIndent: 14),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           // Main Navigation Items (64px Automotive Touch Area)
           Expanded(
@@ -144,8 +194,8 @@ class _NavDockState extends State<NavDock> {
                   const SizedBox(height: 12),
                   _buildNavItem(
                     index: 3,
-                    icon: Icons.speed_rounded,
-                    label: "Gauges",
+                    icon: Icons.bluetooth_rounded,
+                    label: "Bluetooth",
                   ),
                   const SizedBox(height: 12),
                   _buildNavItem(

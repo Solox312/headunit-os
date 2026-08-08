@@ -3,7 +3,7 @@ import '../widgets/nav_dock.dart';
 import 'dashboard_screen.dart';
 import 'projection_screen.dart';
 import 'media_screen.dart';
-import 'vehicle_screen.dart';
+import 'bluetooth_screen.dart';
 import 'settings_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -50,7 +50,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
                 const ProjectionScreen(),
                 const MediaScreen(),
-                const VehicleScreen(),
+                const BluetoothScreen(),
                 const SettingsScreen(),
               ],
             ),

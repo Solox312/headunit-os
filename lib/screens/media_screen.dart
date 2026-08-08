@@ -417,7 +417,7 @@ class MediaScreen extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: () {
-                media.playDefaultTrack();
+                media.setAudioMode(media.currentMode);
               },
             ),
           ],

@@ -13,6 +13,8 @@ An open-source, automotive-grade touchscreen **HeadUnit OS** built for **Raspber
   * **Auto-Detect Mode**: Automatically uses hardware USB dongles when plugged in, otherwise falling back to native software wireless.
 * **📻 Multi-Target Audio Routing**: Instant UI switching between **AUX Cable / 3.5mm DAC**, **Car Bluetooth Stereo (A2DP)**, **FM Transmitter (88.3 MHz)**, and **HDMI Speakers**.
 * **⚡ Intelligent Ignition Power Management**: Auto-boots on car key turn via 3-wire Intelligent Power HAT (Constant 12V + Switched ACC) and executes graceful `sudo shutdown -h now` via GPIO upon key removal to protect SD card integrity.
+* **📶 Wi-Fi & Network Management**: Integrated Linux NetworkManager (`nmcli`) scanner and touchscreen password modal to connect to home/mobile Wi-Fi access points on Raspberry Pi and Linux desktop.
+* **⚡ Bluetooth Device Manager**: Linux BlueZ (`bluetoothctl`) manager for scanning, pairing, A2DP stereo streaming, and hands-free phone connections.
 * **🖥️ Responsive Display Scaling**: Adaptive scaling for **10.1" 1280x800**, **10.1" 1024x600**, **10.1" 1280x720**, and **7"** displays.
 
 ---
@@ -26,6 +28,8 @@ An open-source, automotive-grade touchscreen **HeadUnit OS** built for **Raspber
 | **[Hardware Shopping List](docs/hardware_shopping_list.md)** | Complete parts breakdown, prices, cables, and 12V power accessories. |
 | **[Hardware Assembly Guide](docs/hardware_assembly_guide.md)** | Step-by-step physical build, bench testing, 12V wiring, and dash mounting. |
 | **[Raspberry Pi Setup Guide](docs/rpi_setup_guide.md)** | Raspberry Pi OS 64-bit setup, Flutter ARM64 build, display resolution, and systemd kiosk autostart. |
+| **[Wi-Fi Setup Guide](docs/wifi_setup_guide.md)** | Raspberry Pi and Linux NetworkManager (`nmcli`) Wi-Fi scanning, connection, and Polkit setup. |
+| **[Bluetooth Setup Guide](docs/bluetooth_setup_guide.md)** | Linux BlueZ (`bluetoothctl`) pairing, A2DP audio sink, and discoverable mode configuration. |
 | **[Native Android Auto Protocol Guide](docs/native_android_auto_protocol.md)** | Architecture breakdown of AOA 2.0, Bluetooth RFCOMM, 5GHz Wi-Fi Direct, and Protobuf channels. |
 | **[Carlinkit Dongle Guide](docs/carlinkit_dongle_guide.md)** | Setting up USB `udev` permissions, `libusb` drivers, and video/audio stream bridging. |
 

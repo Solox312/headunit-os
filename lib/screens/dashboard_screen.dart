@@ -7,6 +7,7 @@ import '../theme/automotive_colors.dart';
 import '../widgets/glass_card.dart';
 import '../providers/media_provider.dart';
 import '../providers/projection_provider.dart';
+import '../providers/wifi_provider.dart';
 import '../models/projection_state.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -70,108 +71,150 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                     child: GlassCard(
                       child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: AutomotiveColors.glassPanel,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: AutomotiveColors.stroke, width: 1.0),
-                                  ),
-                                  child: const Icon(
-                                    Icons.wb_sunny_rounded,
-                                    color: AutomotiveColors.orangeAccent,
-                                    size: 24,
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                        padding: const EdgeInsets.all(16.0),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Consumer<WifiProvider>(
+                                builder: (context, wifi, child) {
+                                  final bool isConnected = wifi.isConnected;
+                                  final String ssid = wifi.connectedSsid ?? "No Wi-Fi";
+
+                                  return Row(
                                     children: [
-                                      Text(
-                                        "72°F Sunny",
-                                        style: GoogleFonts.spaceGrotesk(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: AutomotiveColors.textPrimary,
+                                      Container(
+                                        width: 48,
+                                        height: 48,
+                                        decoration: BoxDecoration(
+                                          color: AutomotiveColors.glassPanel,
+                                          borderRadius: BorderRadius.circular(14),
+                                          border: Border.all(color: AutomotiveColors.stroke, width: 1.0),
+                                        ),
+                                        child: Icon(
+                                          isConnected ? Icons.wb_sunny_rounded : Icons.directions_car_filled_rounded,
+                                          color: isConnected ? AutomotiveColors.orangeAccent : AutomotiveColors.electricCyan,
+                                          size: 24,
                                         ),
                                       ),
-                                      Text(
-                                        "Low 64°F • High 78°F",
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.jetBrainsMono(
-                                          fontSize: 11,
-                                          color: AutomotiveColors.textSecondary,
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              isConnected ? "72°F Sunny" : "HeadUnit OS",
+                                              style: GoogleFonts.spaceGrotesk(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                                color: AutomotiveColors.textPrimary,
+                                              ),
+                                            ),
+                                            Text(
+                                              isConnected ? "Low 64°F • High 78°F" : "System Online • Connect Wi-Fi for Weather",
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: GoogleFonts.jetBrainsMono(
+                                                fontSize: 11,
+                                                color: AutomotiveColors.textSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: isConnected
+                                              ? AutomotiveColors.nativeGreen.withAlpha(30)
+                                              : AutomotiveColors.stroke,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(
+                                            color: isConnected
+                                                ? AutomotiveColors.nativeGreen.withAlpha(120)
+                                                : AutomotiveColors.strokeSoft,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              isConnected ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                                              color: isConnected ? AutomotiveColors.nativeGreen : AutomotiveColors.textMuted,
+                                              size: 16,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              isConnected ? ssid : "Disconnected",
+                                              style: GoogleFonts.inter(
+                                                fontSize: 11,
+                                                fontWeight: isConnected ? FontWeight.bold : FontWeight.w500,
+                                                color: isConnected ? AutomotiveColors.textPrimary : AutomotiveColors.textMuted,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
-                                  ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                _timeString,
+                                style: GoogleFonts.spaceGrotesk(
+                                  fontSize: 38,
+                                  fontWeight: FontWeight.bold,
+                                  color: AutomotiveColors.textPrimary,
+                                  letterSpacing: -0.5,
                                 ),
-                              ],
-                            ),
-                            const Spacer(),
-                            Text(
-                              _timeString,
-                              style: GoogleFonts.spaceGrotesk(
-                                fontSize: 38,
-                                fontWeight: FontWeight.bold,
-                                color: AutomotiveColors.textPrimary,
-                                letterSpacing: -0.5,
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _dateString,
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: AutomotiveColors.electricCyan,
-                              ),
-                            ),
-                            const Spacer(),
-                            const Divider(color: AutomotiveColors.strokeSoft),
-                            const SizedBox(height: 12),
-                            // Quick App Launchers
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: [
-                                _buildQuickLauncher(
-                                  context,
-                                  label: "Navigation",
-                                  icon: Icons.navigation_rounded,
+                              const SizedBox(height: 4),
+                              Text(
+                                _dateString,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
                                   color: AutomotiveColors.electricCyan,
-                                  onTap: widget.onOpenProjection,
                                 ),
-                                _buildQuickLauncher(
-                                  context,
-                                  label: "Music",
-                                  icon: Icons.headphones_rounded,
-                                  color: AutomotiveColors.dongleViolet,
-                                  onTap: () {
-                                    if (widget.onOpenMedia != null) {
-                                      widget.onOpenMedia!();
-                                    }
-                                  },
-                                ),
-                                _buildQuickLauncher(
-                                  context,
-                                  label: "Phone",
-                                  icon: Icons.phone_rounded,
-                                  color: AutomotiveColors.nativeGreen,
-                                  onTap: widget.onOpenProjection,
-                                ),
-                              ],
-                            ),
-                          ],
+                              ),
+                              const SizedBox(height: 24),
+                              const Divider(color: AutomotiveColors.strokeSoft),
+                              const SizedBox(height: 12),
+                              // Quick App Launchers
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                children: [
+                                  _buildQuickLauncher(
+                                    context,
+                                    label: "Navigation",
+                                    icon: Icons.navigation_rounded,
+                                    color: AutomotiveColors.electricCyan,
+                                    onTap: widget.onOpenProjection,
+                                  ),
+                                  _buildQuickLauncher(
+                                    context,
+                                    label: "Music",
+                                    icon: Icons.headphones_rounded,
+                                    color: AutomotiveColors.dongleViolet,
+                                    onTap: () {
+                                      if (widget.onOpenMedia != null) {
+                                        widget.onOpenMedia!();
+                                      }
+                                    },
+                                  ),
+                                  _buildQuickLauncher(
+                                    context,
+                                    label: "Phone",
+                                    icon: Icons.phone_rounded,
+                                    color: AutomotiveColors.nativeGreen,
+                                    onTap: widget.onOpenProjection,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

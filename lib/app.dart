@@ -4,6 +4,9 @@ import 'theme/automotive_theme.dart';
 import 'providers/vehicle_provider.dart';
 import 'providers/media_provider.dart';
 import 'providers/projection_provider.dart';
+import 'providers/wifi_provider.dart';
+import 'providers/bluetooth_provider.dart';
+import 'providers/fm_transmitter_provider.dart';
 import 'screens/main_navigation_screen.dart';
 
 class RpiHeadunitApp extends StatelessWidget {
@@ -16,6 +19,9 @@ class RpiHeadunitApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => VehicleProvider()),
         ChangeNotifierProvider(create: (_) => MediaProvider()),
         ChangeNotifierProvider(create: (_) => ProjectionProvider()),
+        ChangeNotifierProvider(create: (_) => WifiProvider()),
+        ChangeNotifierProvider(create: (_) => BluetoothProvider()),
+        ChangeNotifierProvider(create: (_) => FmTransmitterProvider()),
       ],
       child: MaterialApp(
         title: 'HeadUnit OS',
