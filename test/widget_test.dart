@@ -6,7 +6,7 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rpi_headunit/app.dart';
+import 'package:headunit_os/app.dart';
 
 void main() {
   testWidgets('Head unit app smoke test', (WidgetTester tester) async {

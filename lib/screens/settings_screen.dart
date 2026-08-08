@@ -17,7 +17,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
   double _brightness = 0.85;
   bool _wirelessHotspot = true;
   bool _autoConnect = true;
-  final String _audioOutput = "RPi HDMI / Audio Jack";
+  String _audioOutputTarget = "AUX Cable / 3.5mm DAC";
+
+  void _showAudioOutputDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AutomotiveColors.cardBackground,
+          title: Text(
+            "Select Audio Output Target",
+            style: GoogleFonts.orbitron(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildAudioTargetOption("AUX Cable / 3.5mm DAC", Icons.cable_rounded, "Plugged into Car AUX Input Port"),
+              _buildAudioTargetOption("Car Bluetooth Stereo (A2DP)", Icons.bluetooth_audio_rounded, "Wireless stream to Car's Factory Bluetooth"),
+              _buildAudioTargetOption("FM Transmitter (88.3 MHz)", Icons.radio_rounded, "Broadcast to Car's FM Radio Frequency"),
+              _buildAudioTargetOption("HDMI Display Speakers", Icons.tv_rounded, "Built-in monitor speakers"),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Close", style: TextStyle(color: AutomotiveColors.cyanAccent)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildAudioTargetOption(String target, IconData icon, String subtitle) {
+    final bool isSelected = _audioOutputTarget == target;
+
+    return ListTile(
+      leading: Icon(icon, color: isSelected ? AutomotiveColors.cyanAccent : Colors.white70),
+      title: Text(target, style: TextStyle(color: isSelected ? AutomotiveColors.cyanAccent : Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      subtitle: Text(subtitle, style: const TextStyle(color: AutomotiveColors.textSecondary, fontSize: 11)),
+      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AutomotiveColors.cyanAccent) : null,
+      onTap: () {
+        setState(() {
+          _audioOutputTarget = target;
+        });
+        Navigator.pop(context);
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -142,8 +189,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ListTile(
                           leading: const Icon(Icons.speaker_group_rounded, color: AutomotiveColors.blueAccent),
                           title: const Text("Audio Output Target", style: TextStyle(color: Colors.white)),
-                          subtitle: Text(_audioOutput, style: const TextStyle(color: AutomotiveColors.textSecondary, fontSize: 12)),
-                          trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: AutomotiveColors.textMuted),
+                          subtitle: Text(_audioOutputTarget, style: const TextStyle(color: AutomotiveColors.textSecondary, fontSize: 12)),
+                          trailing: const Icon(Icons.tune_rounded, color: AutomotiveColors.cyanAccent),
+                          onTap: _showAudioOutputDialog,
                         ),
                         const ListTile(
                           leading: Icon(Icons.developer_board_rounded, color: AutomotiveColors.greenAccent),

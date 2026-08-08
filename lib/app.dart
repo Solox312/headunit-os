@@ -18,7 +18,7 @@ class RpiHeadunitApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProjectionProvider()),
       ],
       child: MaterialApp(
-        title: 'Raspberry Pi DIY Head Unit',
+        title: 'HeadUnit OS',
         debugShowCheckedModeBanner: false,
         theme: AutomotiveTheme.darkTheme,
         home: const MainNavigationScreen(),

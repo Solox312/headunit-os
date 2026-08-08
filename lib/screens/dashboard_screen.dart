@@ -1,22 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'dart:async';
 import '../theme/automotive_colors.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/gauge_widget.dart';
-import '../providers/vehicle_provider.dart';
 import '../providers/media_provider.dart';
 import '../providers/projection_provider.dart';
 import '../models/projection_state.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   final VoidCallback onOpenProjection;
 
   const DashboardScreen({super.key, required this.onOpenProjection});
 
   @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  late String _timeString;
+  late String _dateString;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateTime();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateTime());
+  }
+
+  void _updateTime() {
+    if (mounted) {
+      final now = DateTime.now();
+      setState(() {
+        _timeString = DateFormat('h:mm:ss a').format(now);
+        _dateString = DateFormat('EEEE, MMMM d, yyyy').format(now);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final vehicle = Provider.of<VehicleProvider>(context);
     final media = Provider.of<MediaProvider>(context);
     final projection = Provider.of<ProjectionProvider>(context);
 
@@ -26,38 +57,94 @@ class DashboardScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: Row(
           children: [
-            // Left Column: Speedometer & Telemetry Widget
+            // Left Column: Clock, Date, Weather & Quick App Launcher Card
             Expanded(
-              flex: 4,
+              flex: 5,
               child: Column(
                 children: [
                   Expanded(
                     child: GlassCard(
-                      child: Center(
-                        child: GaugeWidget(
-                          value: vehicle.status.speedMph,
-                          minValue: 0,
-                          maxValue: 140,
-                          title: "Speed",
-                          unit: "MPH",
-                          accentColor: AutomotiveColors.cyanAccent,
-                          size: 210,
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.wb_sunny_rounded, color: AutomotiveColors.orangeAccent, size: 36),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "72°F Sunny",
+                                        style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                      ),
+                                      Text(
+                                        "Low 64°F • High 78°F",
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.inter(fontSize: 12, color: AutomotiveColors.textSecondary),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Spacer(),
+                            Text(
+                              _timeString,
+                              style: GoogleFonts.orbitron(
+                                fontSize: 38,
+                                fontWeight: FontWeight.bold,
+                                color: AutomotiveColors.textPrimary,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _dateString,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AutomotiveColors.cyanAccent,
+                              ),
+                            ),
+                            const Spacer(),
+                            const Divider(color: AutomotiveColors.cardBorder),
+                            const SizedBox(height: 12),
+                            // Quick App Launchers
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _buildQuickLauncher(
+                                  context,
+                                  label: "Navigation",
+                                  icon: Icons.navigation_rounded,
+                                  color: Colors.greenAccent,
+                                  onTap: widget.onOpenProjection,
+                                ),
+                                _buildQuickLauncher(
+                                  context,
+                                  label: "Music",
+                                  icon: Icons.music_note_rounded,
+                                  color: Colors.pinkAccent,
+                                  onTap: () {},
+                                ),
+                                _buildQuickLauncher(
+                                  context,
+                                  label: "Phone",
+                                  icon: Icons.phone_rounded,
+                                  color: Colors.blueAccent,
+                                  onTap: widget.onOpenProjection,
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Quick OBD-II Telemetry Bar
-                  GlassCard(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildQuickMetric("RPM", vehicle.status.rpm.toInt().toString(), "rpm", AutomotiveColors.blueAccent),
-                        _buildQuickMetric("GEAR", vehicle.status.gear.name, "", AutomotiveColors.cyanAccent),
-                        _buildQuickMetric("COOLANT", "${vehicle.status.coolantTempF.toInt()}°", "F", AutomotiveColors.orangeAccent),
-                        _buildQuickMetric("FUEL", "${vehicle.status.fuelPercent.toInt()}%", "", AutomotiveColors.greenAccent),
-                      ],
                     ),
                   ),
                 ],
@@ -74,7 +161,7 @@ class DashboardScreen extends StatelessWidget {
                   Expanded(
                     flex: 5,
                     child: GlassCard(
-                      onTap: onOpenProjection,
+                      onTap: widget.onOpenProjection,
                       borderColor: projection.state.mode == ProjectionMode.appleCarPlay
                           ? AutomotiveColors.carPlayColor
                           : (projection.state.mode == ProjectionMode.androidAuto
@@ -90,12 +177,12 @@ class DashboardScreen extends StatelessWidget {
                                   projection.state.mode == ProjectionMode.appleCarPlay
                                       ? Icons.phone_iphone_rounded
                                       : Icons.phone_android_rounded,
-                                  size: 44,
+                                  size: 48,
                                   color: projection.state.mode == ProjectionMode.appleCarPlay
                                       ? AutomotiveColors.carPlayColor
                                       : AutomotiveColors.androidAutoColor,
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 12),
                                 Text(
                                   projection.state.mode == ProjectionMode.appleCarPlay
                                       ? "Apple CarPlay Active"
@@ -108,9 +195,9 @@ class DashboardScreen extends StatelessWidget {
                                     color: Colors.white,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 6),
                                 Text(
-                                  "Connected to ${projection.state.deviceName} • Tap to view full stream",
+                                  "Connected to ${projection.state.deviceName} • Tap to view full screen",
                                   style: GoogleFonts.inter(fontSize: 12, color: AutomotiveColors.textSecondary),
                                 ),
                               ],
@@ -130,13 +217,13 @@ class DashboardScreen extends StatelessWidget {
                                   Container(
                                     width: 8,
                                     height: 8,
-                                    decoration: const BoxDecoration(
+                                    decoration: BoxDecoration(
                                       color: Colors.greenAccent,
                                       shape: BoxShape.circle,
                                     ),
                                   ),
-                                  const SizedBox(width: 6),
-                                  const Text("LIVE", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                  SizedBox(width: 6),
+                                  Text("LIVE STREAM", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
@@ -154,8 +241,8 @@ class DashboardScreen extends StatelessWidget {
                       child: Row(
                         children: [
                           Container(
-                            width: 80,
-                            height: 80,
+                            width: 76,
+                            height: 76,
                             decoration: BoxDecoration(
                               color: AutomotiveColors.surfaceGlass,
                               borderRadius: BorderRadius.circular(12),
@@ -164,8 +251,8 @@ class DashboardScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(12),
                               child: Image.network(
                                 media.mediaItem.coverUrl,
-                                width: 80,
-                                height: 80,
+                                width: 76,
+                                height: 76,
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) {
                                   return Container(
@@ -180,7 +267,7 @@ class DashboardScreen extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -190,7 +277,7 @@ class DashboardScreen extends StatelessWidget {
                                   media.mediaItem.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -206,7 +293,7 @@ class DashboardScreen extends StatelessWidget {
                             children: [
                               IconButton(
                                 icon: const Icon(Icons.skip_previous_rounded),
-                                iconSize: 32,
+                                iconSize: 30,
                                 onPressed: () => media.previousTrack(),
                               ),
                               IconButton(
@@ -219,7 +306,7 @@ class DashboardScreen extends StatelessWidget {
                               ),
                               IconButton(
                                 icon: const Icon(Icons.skip_next_rounded),
-                                iconSize: 32,
+                                iconSize: 30,
                                 onPressed: () => media.nextTrack(),
                               ),
                             ],
@@ -237,33 +324,33 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickMetric(String label, String value, String unit, Color color) {
-    return Expanded(
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AutomotiveColors.textMuted),
+  Widget _buildQuickLauncher(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: color.withValues(alpha: 0.5)),
             ),
-            const SizedBox(height: 2),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  value,
-                  style: GoogleFonts.orbitron(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                if (unit.isNotEmpty) ...[
-                  const SizedBox(width: 2),
-                  Text(unit, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
-                ],
-              ],
-            ),
-          ],
-        ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+          ),
+        ],
       ),
     );
   }
