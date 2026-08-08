@@ -79,10 +79,14 @@ cd "$BUILD_DIR"
 rm -rf aasdk
 git clone --depth=1 https://github.com/f1xpl/aasdk.git
 
-info "Patching aasdk for Boost 1.70+, OpenSSL 3.0, and libusb 1.0.27+ compatibility..."
+info "Patching aasdk for Boost 1.70+, OpenSSL 3.0, and API compatibility..."
 find aasdk -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
 sed -i '1s/^/#include <boost\/core\/noncopyable.hpp>\n/' aasdk/include/f1x/aasdk/IO/Promise.hpp
 sed -i 's/FIPS_mode_set(0);//g' aasdk/src/Transport/SSLWrapper.cpp
+
+# Make onAVChannelStopIndication a default virtual function instead of pure virtual (= 0)
+find aasdk -type f -name "*.hpp" -exec sed -i 's/onAVChannelStopIndication(\([^)]*\)) = 0;/onAVChannelStopIndication(\1) {}/g' {} +
+
 # libusb 1.0.27 made libusb_hotplug_flag a real enum; aasdk passes the bare
 # LIBUSB_HOTPLUG_NO_FLAGS macro (an int) into that parameter with no cast,
 # which newer GCC rejects outright. Cast it explicitly rather than relying
@@ -118,15 +122,8 @@ cd "$BUILD_DIR"
 if [[ ! -d "openauto" ]]; then
   git clone --depth=1 https://github.com/f1xpl/openauto.git
   
-  info "Patching openauto for Boost 1.70+ and aasdk API compatibility..."
+  info "Patching openauto for Boost 1.70+ compatibility..."
   find openauto -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
-  
-  # Implement missing pure virtual onAVChannelStopIndication in event handlers
-  sed -i 's/public:/public:\n    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication\&) override {}/' openauto/include/f1x/openauto/autoapp/Service/VideoService.hpp
-  sed -i 's/public:/public:\n    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication\&) override {}/' openauto/include/f1x/openauto/autoapp/Service/MediaAudioService.hpp
-  sed -i 's/public:/public:\n    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication\&) override {}/' openauto/include/f1x/openauto/autoapp/Service/SpeechAudioService.hpp
-  sed -i 's/public:/public:\n    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication\&) override {}/' openauto/include/f1x/openauto/autoapp/Service/SystemAudioService.hpp
-  sed -i 's/public:/public:\n    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication\&) override {}/' openauto/include/f1x/openauto/autoapp/Service/AudioInputService.hpp
 fi
 cd openauto
 mkdir -p build && cd build
