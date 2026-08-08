@@ -63,16 +63,31 @@ class SettingsStorageService {
 
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
-      try {
-        final file = await _getSettingsFile();
-        final tmpFile = File('${file.path}.tmp');
-        await tmpFile.writeAsString(jsonEncode(_inMemorySettings));
-        await tmpFile.rename(file.path);
-        if (kDebugMode) print('[SettingsStorageService] Saved settings cleanly to disk: $_inMemorySettings');
-      } catch (e) {
-        if (kDebugMode) print('[SettingsStorageService] Exception saving settings: $e');
-      }
+      await _writeToDisk();
     });
+  }
+
+  /// Flush any pending debounced save immediately to disk.
+  /// Call this before navigating away from a screen that has unsaved critical
+  /// state (e.g. onboarding completion), so the write is guaranteed before the
+  /// process context changes.
+  Future<void> flush() async {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    await _writeToDisk();
+  }
+
+  Future<void> _writeToDisk() async {
+    if (_inMemorySettings == null) return;
+    try {
+      final file = await _getSettingsFile();
+      final tmpFile = File('${file.path}.tmp');
+      await tmpFile.writeAsString(jsonEncode(_inMemorySettings));
+      await tmpFile.rename(file.path);
+      if (kDebugMode) print('[SettingsStorageService] Saved settings cleanly to disk: $_inMemorySettings');
+    } catch (e) {
+      if (kDebugMode) print('[SettingsStorageService] Exception saving settings: $e');
+    }
   }
 
   /// Helper to save brightness setting specifically.
@@ -106,8 +121,12 @@ class SettingsStorageService {
   }
 
   /// Helper to save onboarding completion state.
+  /// Flushes immediately — this value must be on disk before the caller
+  /// navigates to MainNavigationScreen, or the splash screen will show
+  /// onboarding again on the next launch.
   Future<void> saveOnboardingCompleted(bool completed) async {
     await saveSettings({'onboardingCompleted': completed});
+    await flush();
   }
 
   /// Helper to read stored onboarding completion state (defaults to false).
