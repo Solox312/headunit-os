@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'theme/automotive_theme.dart';
 import 'providers/vehicle_provider.dart';
@@ -88,16 +89,20 @@ class _HardwareCursorOverlayState extends State<HardwareCursorOverlay> {
   Widget build(BuildContext context) {
     return Listener(
       onPointerHover: (event) {
-        setState(() {
-          _cursorPos = event.position;
-          _isPointerActive = true;
-        });
+        if (event.kind == PointerDeviceKind.mouse) {
+          setState(() {
+            _cursorPos = event.position;
+            _isPointerActive = true;
+          });
+        }
       },
       onPointerMove: (event) {
-        setState(() {
-          _cursorPos = event.position;
-          _isPointerActive = true;
-        });
+        if (event.kind == PointerDeviceKind.mouse) {
+          setState(() {
+            _cursorPos = event.position;
+            _isPointerActive = true;
+          });
+        }
       },
       child: Stack(
         children: [
