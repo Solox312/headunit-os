@@ -51,11 +51,19 @@ rm -rf "$TMP_FW"
 echo -e "${GREEN}✓ Intel Bluetooth firmware files copied to /lib/firmware/intel/.${NC}"
 echo ""
 
-# 3. Reload kernel driver module & restart Bluetooth daemon
-echo -e "${CYAN}[3/3] Reloading btusb kernel module & bluetoothd service...${NC}"
+# 3. Enable BlueZ Compatibility & Experimental SDP Profiles (-C --experimental)
+echo -e "${CYAN}[3/3] Configuring bluetoothd compatibility & experimental SDP profiles...${NC}"
+sudo mkdir -p /etc/systemd/system/bluetooth.service.d/
+sudo tee /etc/systemd/system/bluetooth.service.d/override.conf > /dev/null << 'EOF'
+[Service]
+ExecStart=
+ExecStart=/usr/libexec/bluetooth/bluetoothd -C --experimental
+EOF
+
 sudo rfkill unblock bluetooth || true
 sudo modprobe -r btusb 2>/dev/null || true
 sudo modprobe btusb
+sudo systemctl daemon-reload
 sudo systemctl restart bluetooth
 
 echo ""

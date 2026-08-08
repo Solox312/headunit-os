@@ -28,6 +28,8 @@ class BluetoothService {
     }
   }
 
+  Process? _persistentAgentProcess;
+
   /// Initialize Linux Mint & Raspberry Pi Bluetooth Stack (rfkill unblock + BlueZ agent setup)
   Future<bool> initLinuxBluetooth() async {
     if (!await isBluetoothctlAvailable()) return true;
@@ -35,17 +37,20 @@ class BluetoothService {
     try {
       // 1. Unblock Bluetooth radio via rfkill (works on Linux Mint & RPi OS)
       await Process.run('rfkill', ['unblock', 'bluetooth']);
-
-      // 2. Turn power on, set adapter name to "HeadUnit OS", and set default agent
       await Process.run('bluetoothctl', ['power', 'on']);
       await Process.run('bluetoothctl', ['system-alias', 'HeadUnit OS']);
-      await Process.run('hciconfig', ['hci0', 'name', 'HeadUnit OS']);
-      await Process.run('bluetoothctl', ['agent', 'NoInputNoOutput']);
-      await Process.run('bluetoothctl', ['default-agent']);
       await Process.run('bluetoothctl', ['discoverable', 'on']);
       await Process.run('bluetoothctl', ['pairable', 'on']);
 
-      if (kDebugMode) print('[BluetoothService] Initialized Linux Mint & RPi BlueZ stack with broadcast name "HeadUnit OS".');
+      // 2. Launch persistent interactive bluetoothctl process to keep NoInputNoOutput agent active
+      _persistentAgentProcess?.kill();
+      _persistentAgentProcess = await Process.start('bluetoothctl', []);
+      _persistentAgentProcess!.stdin.writeln('agent NoInputNoOutput');
+      _persistentAgentProcess!.stdin.writeln('default-agent');
+      _persistentAgentProcess!.stdin.writeln('discoverable on');
+      _persistentAgentProcess!.stdin.writeln('pairable on');
+
+      if (kDebugMode) print('[BluetoothService] Initialized Linux Mint & RPi BlueZ stack with persistent auto-accept agent.');
       return true;
     } catch (e) {
       if (kDebugMode) print('[BluetoothService] Exception initializing Linux Bluetooth: $e');
