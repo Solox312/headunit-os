@@ -96,7 +96,19 @@ cmake .. \
   -DCMAKE_CXX_FLAGS="-fpermissive" \
   -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX"
 make -j"$(nproc)"
-sudo make install
+
+# aasdk's CMakeLists.txt defines no install() rules at all — "make install"
+# fails with "No rule to make target 'install'" every time. Stage the known
+# build output locations manually instead: shared libs land in ../lib/,
+# hand-written headers in ../include/f1x/, and the protoc-generated
+# aasdk_proto headers land in aasdk_proto/ inside this build directory.
+if ! sudo make install 2>/dev/null; then
+  warn "aasdk has no 'make install' target — staging build output into $INSTALL_PREFIX manually."
+  sudo install -d "$INSTALL_PREFIX/include" "$INSTALL_PREFIX/include/aasdk_proto" "$INSTALL_PREFIX/lib"
+  sudo cp -r ../include/f1x "$INSTALL_PREFIX/include/"
+  sudo cp aasdk_proto/*.pb.h "$INSTALL_PREFIX/include/aasdk_proto/"
+  sudo cp -P ../lib/libaasdk.so ../lib/libaasdk_proto.so "$INSTALL_PREFIX/lib/"
+fi
 sudo ldconfig
 success "aasdk installed to $INSTALL_PREFIX."
 
@@ -117,7 +129,20 @@ cmake .. \
   -DAASDK_INCLUDE_DIRS="$INSTALL_PREFIX/include" \
   -DAASDK_LIBRARIES="$INSTALL_PREFIX/lib/libaasdk.so"
 make -j"$(nproc)"
-sudo make install
+
+# Same author, same era as aasdk — assume it may also lack install() rules
+# rather than guess its layout. If "make install" doesn't exist, locate the
+# built autoapp binary directly instead of hardcoding a path that might be
+# wrong for this checkout.
+if ! sudo make install 2>/dev/null; then
+  warn "openauto has no 'make install' target — locating the built autoapp binary manually."
+  AUTOAPP_BIN=$(find . -maxdepth 4 -type f -name autoapp -perm -u+x | head -1)
+  if [[ -z "$AUTOAPP_BIN" ]]; then
+    error "Could not locate a built 'autoapp' binary under $(pwd). Check the build output above for errors."
+  fi
+  sudo install -d "$INSTALL_PREFIX/bin"
+  sudo install -m 755 "$AUTOAPP_BIN" "$INSTALL_PREFIX/bin/autoapp"
+fi
 success "openauto installed — binary at $INSTALL_PREFIX/bin/autoapp"
 
 # ── 4. OpenAuto configuration ─────────────────────────────────────────────────
