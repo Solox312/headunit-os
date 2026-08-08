@@ -135,9 +135,9 @@ if [ ! -f "$ASSETS_PATH/icudtl.dat" ] && [ -d "$PROJECT_DIR/build/linux/x64/rele
   ASSETS_PATH="$PROJECT_DIR/build/linux/x64/release/bundle"
 fi
 
-FLUTTER_PI_FLAGS="--enable-cursor"
+FLUTTER_PI_FLAGS=""
 if [ -f "$ASSETS_PATH/app.so" ] || [ -f "$ASSETS_PATH/lib/libapp.so" ]; then
-  FLUTTER_PI_FLAGS="$FLUTTER_PI_FLAGS --release"
+  FLUTTER_PI_FLAGS="--release"
 fi
 
 sudo tee /etc/systemd/system/headunit.service > /dev/null << EOF
