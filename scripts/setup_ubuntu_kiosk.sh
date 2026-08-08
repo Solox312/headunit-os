@@ -65,17 +65,22 @@ if command -v flutter &> /dev/null; then
   flutter build linux --release || true
   flutter build bundle --target-platform=linux-x64
   
-  # Copy icudtl.dat from Flutter engine cache or release bundle into flutter_assets
-  ICU_FILE=$(find "$PROJECT_DIR/build" -name "icudtl.dat" 2>/dev/null | head -n 1)
+  mkdir -p "$PROJECT_DIR/build/flutter_assets"
+  mkdir -p "$PROJECT_DIR/build/linux/x64/release/bundle"
+
+  # Broadly locate icudtl.dat in system, build output, or Flutter SDK cache
+  ICU_LOCATIONS=$(find "$PROJECT_DIR/build" "$HOME/.snap" "$HOME/flutter" "/tmp" -name "icudtl.dat" 2>/dev/null)
+  ICU_FILE=$(echo "$ICU_LOCATIONS" | head -n 1)
+  
   if [ -n "$ICU_FILE" ]; then
-    cp "$ICU_FILE" "$PROJECT_DIR/build/flutter_assets/" 2>/dev/null || true
-  else
-    FLUTTER_BIN=$(which flutter)
-    FLUTTER_DIR=$(dirname $(dirname "$FLUTTER_BIN"))
-    ICU_ENGINE=$(find "$FLUTTER_DIR" -name "icudtl.dat" 2>/dev/null | head -n 1)
-    if [ -n "$ICU_ENGINE" ]; then
-      cp "$ICU_ENGINE" "$PROJECT_DIR/build/flutter_assets/" 2>/dev/null || true
+    echo "Found icudtl.dat at $ICU_FILE"
+    cp "$ICU_FILE" "$PROJECT_DIR/build/flutter_assets/icudtl.dat" 2>/dev/null || true
+    cp "$ICU_FILE" "$PROJECT_DIR/build/linux/x64/release/bundle/icudtl.dat" 2>/dev/null || true
+    if [ -d "$PROJECT_DIR/build/linux/x64/release/bundle/data/flutter_assets" ]; then
+      cp "$ICU_FILE" "$PROJECT_DIR/build/linux/x64/release/bundle/data/flutter_assets/icudtl.dat" 2>/dev/null || true
     fi
+  else
+    echo -e "${YELLOW}⚠️  Could not locate icudtl.dat automatically.${NC}"
   fi
   echo -e "${GREEN}✓ Flutter assets bundle & icudtl.dat prepared successfully.${NC}"
 else
@@ -92,9 +97,9 @@ echo ""
 # ── 5. Install & Start Systemd Kiosk Service ─────────────────────────────────
 echo -e "${CYAN}[5/5] Installing /etc/systemd/system/headunit.service...${NC}"
 
-ASSETS_PATH="$PROJECT_DIR/build/linux/x64/release/bundle"
-if [ ! -d "$ASSETS_PATH" ]; then
-  ASSETS_PATH="$PROJECT_DIR/build/flutter_assets"
+ASSETS_PATH="$PROJECT_DIR/build/flutter_assets"
+if [ ! -f "$ASSETS_PATH/icudtl.dat" ] && [ -d "$PROJECT_DIR/build/linux/x64/release/bundle" ]; then
+  ASSETS_PATH="$PROJECT_DIR/build/linux/x64/release/bundle"
 fi
 
 sudo tee /etc/systemd/system/headunit.service > /dev/null << EOF
