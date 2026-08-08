@@ -29,13 +29,13 @@ Because Ubuntu Server does not include a desktop environment (No Xorg/Wayland), 
 
 ## 2. Post-Installation Initial Setup
 
-Log in to your Ubuntu Server console or via SSH:
+Fresh Ubuntu Server installations do not ship with `git`. Update your package lists and install `git` first:
 
 ```bash
 # 1. Update system package repositories
 sudo apt update && sudo apt upgrade -y
 
-# 2. Install Git and basic utilities
+# 2. Install Git and basic build tools
 sudo apt install -y git curl wget build-essential cmake pkg-config
 ```
 
@@ -43,12 +43,15 @@ sudo apt install -y git curl wget build-essential cmake pkg-config
 
 ## 3. Clone Repository & Grant Permissions
 
-Clone the HeadUnit OS repository to your home directory:
+Now clone the HeadUnit OS repository, grant script permissions, and configure Git:
 
 ```bash
 cd ~$
 git clone https://github.com/Solox312/headunit-os.git
 cd headunit-os
+
+# Grant execute permissions to all install & utility scripts
+chmod +x scripts/*.sh
 
 # Configure Git autostash to avoid pull conflicts in the future
 git config --global pull.rebase true
