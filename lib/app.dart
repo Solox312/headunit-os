@@ -37,10 +37,12 @@ class RpiHeadunitApp extends StatelessWidget {
         theme: AutomotiveTheme.darkTheme,
         home: const SplashScreen(),
         builder: (context, child) {
-          return Stack(
-            children: [
-              child ?? const SizedBox.shrink(),
-              Consumer<KeyboardProvider>(
+          return MouseRegion(
+            cursor: SystemMouseCursors.basic,
+            child: Stack(
+              children: [
+                child ?? const SizedBox.shrink(),
+                Consumer<KeyboardProvider>(
                 builder: (context, kb, _) {
                   if (!kb.isVisible || kb.controller == null) return const SizedBox.shrink();
                   return Positioned(
@@ -62,8 +64,9 @@ class RpiHeadunitApp extends StatelessWidget {
                 },
               ),
             ],
-          );
-        },
+          ),
+        );
+      },
       ),
     );
   }
