@@ -82,7 +82,20 @@ if command -v flutter &> /dev/null; then
   else
     echo -e "${YELLOW}⚠️  Could not locate icudtl.dat automatically.${NC}"
   fi
-  echo -e "${GREEN}✓ Flutter assets bundle & icudtl.dat prepared successfully.${NC}"
+
+  # Broadly locate libflutter_engine.so in system, build output, or Flutter SDK cache
+  ENGINE_LOCATIONS=$(find "$PROJECT_DIR/build" "$HOME" "/tmp" -name "libflutter_engine.so" 2>/dev/null || true)
+  ENGINE_FILE=$(echo "$ENGINE_LOCATIONS" | head -n 1)
+  
+  if [ -n "$ENGINE_FILE" ]; then
+    echo "Found libflutter_engine.so at $ENGINE_FILE"
+    sudo cp "$ENGINE_FILE" "/usr/local/lib/libflutter_engine.so"
+    sudo ldconfig
+  else
+    echo -e "${YELLOW}⚠️  Could not locate libflutter_engine.so automatically.${NC}"
+  fi
+
+  echo -e "${GREEN}✓ Flutter assets bundle, icudtl.dat, & libflutter_engine.so prepared successfully.${NC}"
 else
   echo -e "${YELLOW}⚠️  Flutter SDK not found in PATH. Skipping build step (assuming pre-built bundle).${NC}"
 fi
