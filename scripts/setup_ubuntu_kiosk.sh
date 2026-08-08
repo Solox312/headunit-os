@@ -164,6 +164,9 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
+# Silence low-level kernel and DRM console warnings on TTY1
+sudo dmesg -n 1 2>/dev/null || true
+
 sudo systemctl set-default multi-user.target
 sudo systemctl daemon-reload
 sudo systemctl enable headunit.service
