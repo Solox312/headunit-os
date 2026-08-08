@@ -80,12 +80,21 @@ rm -rf aasdk
 git clone --depth=1 https://github.com/f1xpl/aasdk.git
 
 info "Patching aasdk for Boost 1.70+, OpenSSL 3.0, and API compatibility..."
-find aasdk -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} \;
+find aasdk -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
 sed -i '1s/^/#include <boost\/core\/noncopyable.hpp>\n/' aasdk/include/f1x/aasdk/IO/Promise.hpp
 sed -i 's/FIPS_mode_set(0);//g' aasdk/src/Transport/SSLWrapper.cpp
 
 # Make onAVChannelStopIndication a default virtual function instead of pure virtual (= 0)
-find aasdk -type f -name "*.hpp" -exec sed -i 's/onAVChannelStopIndication(\([^)]*\)) = 0;/onAVChannelStopIndication(\1) {}/g' {} \;
+python3 -c "
+import glob
+for path in glob.glob('aasdk/**/*.hpp', recursive=True):
+    with open(path, 'r') as f:
+        content = f.read()
+    if 'onAVChannelStopIndication' in content:
+        content = content.replace('virtual void onAVChannelStopIndication(const proto::messages::AVChannelStopIndication& indication) = 0;', 'virtual void onAVChannelStopIndication(const proto::messages::AVChannelStopIndication& indication) {}')
+        with open(path, 'w') as f:
+            f.write(content)
+"
 
 # libusb 1.0.27 made libusb_hotplug_flag a real enum; aasdk passes the bare
 # LIBUSB_HOTPLUG_NO_FLAGS macro (an int) into that parameter with no cast,
