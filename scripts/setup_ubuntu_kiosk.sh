@@ -84,8 +84,12 @@ if command -v flutter &> /dev/null; then
   fi
 
   # Broadly locate libflutter_engine.so in system, build output, or Flutter SDK cache
-  ENGINE_LOCATIONS=$(find "$PROJECT_DIR/build" "$HOME" "/tmp" -name "libflutter_engine.so" 2>/dev/null || true)
-  ENGINE_FILE=$(echo "$ENGINE_LOCATIONS" | head -n 1)
+  ENGINE_FILE=""
+  if [ -f "$PROJECT_DIR/build/linux/x64/release/bundle/lib/libflutter_engine.so" ]; then
+    ENGINE_FILE="$PROJECT_DIR/build/linux/x64/release/bundle/lib/libflutter_engine.so"
+  else
+    ENGINE_FILE=$(find "$PROJECT_DIR/build" "$HOME" -name "libflutter_engine.so" 2>/dev/null | head -n 1)
+  fi
   
   if [ -n "$ENGINE_FILE" ]; then
     echo "Found libflutter_engine.so at $ENGINE_FILE"
