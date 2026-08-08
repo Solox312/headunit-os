@@ -102,6 +102,11 @@ if [ ! -f "$ASSETS_PATH/icudtl.dat" ] && [ -d "$PROJECT_DIR/build/linux/x64/rele
   ASSETS_PATH="$PROJECT_DIR/build/linux/x64/release/bundle"
 fi
 
+FLUTTER_PI_FLAGS=""
+if [ -f "$ASSETS_PATH/app.so" ] || [ -f "$ASSETS_PATH/lib/libapp.so" ]; then
+  FLUTTER_PI_FLAGS="--release"
+fi
+
 sudo tee /etc/systemd/system/headunit.service > /dev/null << EOF
 [Unit]
 Description=HeadUnit OS Automotive Touchscreen UI
@@ -113,7 +118,7 @@ Type=simple
 User=$CURRENT_USER
 Group=$CURRENT_USER
 WorkingDirectory=$PROJECT_DIR
-ExecStart=/usr/local/bin/flutter-pi --release $ASSETS_PATH
+ExecStart=/usr/local/bin/flutter-pi $FLUTTER_PI_FLAGS $ASSETS_PATH
 Restart=always
 RestartSec=1
 StandardOutput=journal
