@@ -69,7 +69,7 @@ if command -v flutter &> /dev/null; then
   mkdir -p "$PROJECT_DIR/build/linux/x64/release/bundle"
 
   # Broadly locate icudtl.dat in system, build output, or Flutter SDK cache
-  ICU_LOCATIONS=$(find "$PROJECT_DIR/build" "$HOME/.snap" "$HOME/flutter" "/tmp" -name "icudtl.dat" 2>/dev/null)
+  ICU_LOCATIONS=$(find "$PROJECT_DIR/build" "$HOME" "/tmp" -name "icudtl.dat" 2>/dev/null || true)
   ICU_FILE=$(echo "$ICU_LOCATIONS" | head -n 1)
   
   if [ -n "$ICU_FILE" ]; then
