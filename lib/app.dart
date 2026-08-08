@@ -7,6 +7,7 @@ import 'providers/projection_provider.dart';
 import 'providers/wifi_provider.dart';
 import 'providers/bluetooth_provider.dart';
 import 'providers/fm_transmitter_provider.dart';
+import 'providers/display_provider.dart';
 import 'screens/main_navigation_screen.dart';
 
 class RpiHeadunitApp extends StatelessWidget {
@@ -22,6 +23,7 @@ class RpiHeadunitApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => WifiProvider()),
         ChangeNotifierProvider(create: (_) => BluetoothProvider()),
         ChangeNotifierProvider(create: (_) => FmTransmitterProvider()),
+        ChangeNotifierProvider(create: (_) => DisplayProvider()),
       ],
       child: MaterialApp(
         title: 'HeadUnit OS',

@@ -89,14 +89,14 @@ class WifiProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final success = await _service.connectToNetwork(ssid, password);
-      if (success) {
+      final result = await _service.connectToNetwork(ssid, password);
+      if (result.success) {
         _connectedSsid = ssid;
         await refreshStatus();
         await scanNetworks();
         return true;
       } else {
-        _errorMessage = "Failed to connect to '$ssid'. Check password and try again.";
+        _errorMessage = result.errorMessage ?? "Failed to connect to '$ssid'. Check password and try again.";
         return false;
       }
     } catch (e) {

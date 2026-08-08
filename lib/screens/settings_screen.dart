@@ -7,7 +7,9 @@ import '../providers/projection_provider.dart';
 import '../providers/wifi_provider.dart';
 import '../providers/bluetooth_provider.dart';
 import '../providers/fm_transmitter_provider.dart';
+import '../providers/display_provider.dart';
 import '../services/fm_transmitter_service.dart';
+import '../services/system_info_service.dart';
 import '../models/projection_state.dart';
 import '../models/wifi_network.dart';
 
@@ -217,23 +219,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSystemSpecRow("OS Version", "HeadUnit OS v1.0.0 (Automotive Build 104)"),
-                _buildSystemSpecRow("Flutter Framework", "v3.29.0 • Linux Desktop ARM64 / x86_64"),
-                _buildSystemSpecRow("Linux Kernel", "6.6.20-v8+ #1741 SMP PREEMPT"),
-                _buildSystemSpecRow("Hardware Platform", "Raspberry Pi 4 / 5 (Broadcom BCM2711)"),
-                _buildSystemSpecRow("CPU Architecture", "ARM64 (aarch64) Quad-Core @ 1.8 GHz"),
-                _buildSystemSpecRow("Display Output", "10.1\" 1280x800 Glassmorphic Touchscreen"),
-                _buildSystemSpecRow("Power HAT", "3-Wire Ignition HAT (12V Constant + Switched ACC)"),
-                _buildSystemSpecRow("Bluetooth Stack", "Linux BlueZ 5.72 (A2DP Sink + RFCOMM)"),
-                _buildSystemSpecRow("Wi-Fi Stack", "Broadcom BCM43455 5GHz Access Point"),
-                _buildSystemSpecRow("Audio Subsystem", "ALSA / PulseAudio 16.1 Direct Sink"),
-              ],
-            ),
+          content: FutureBuilder<SystemInfoData>(
+            future: SystemInfoService.getRealSystemInfo(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Padding(
+                  padding: EdgeInsets.all(20.0),
+                  child: Center(child: CircularProgressIndicator(color: AutomotiveColors.electricCyan)),
+                );
+              }
+              final sys = snapshot.data!;
+              final wifi = context.watch<WifiProvider>();
+
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSystemSpecRow("OS Version", sys.osVersion),
+                    _buildSystemSpecRow("Hardware Model", sys.hardwareModel),
+                    _buildSystemSpecRow("Operating System / Kernel", sys.kernelVersion),
+                    _buildSystemSpecRow("CPU & Processors", sys.cpuArchitecture),
+                    _buildSystemSpecRow("System Memory", sys.totalRam),
+                    _buildSystemSpecRow("Runtime Environment", sys.dartVersion),
+                    _buildSystemSpecRow("Network Interface (IP)", wifi.isConnected ? "${wifi.connectedSsid} (${wifi.ipAddress ?? '127.0.0.1'})" : "Disconnected"),
+                  ],
+                ),
+              );
+            },
           ),
           actions: [
             TextButton(
@@ -680,31 +693,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
                         ),
                         const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            const Icon(Icons.brightness_medium_rounded, color: AutomotiveColors.electricCyan),
-                            const SizedBox(width: 12),
-                            Text("Screen Brightness", style: GoogleFonts.inter(fontSize: 14, color: AutomotiveColors.textPrimary)),
-                            Expanded(
-                              child: SliderTheme(
-                                data: SliderThemeData(
-                                  activeTrackColor: AutomotiveColors.electricCyan,
-                                  inactiveTrackColor: AutomotiveColors.stroke,
-                                  thumbColor: AutomotiveColors.textPrimary,
+                        Consumer<DisplayProvider>(
+                          builder: (context, display, child) {
+                            return Row(
+                              children: [
+                                const Icon(Icons.brightness_medium_rounded, color: AutomotiveColors.electricCyan),
+                                const SizedBox(width: 12),
+                                Text("Screen Brightness", style: GoogleFonts.inter(fontSize: 14, color: AutomotiveColors.textPrimary)),
+                                Expanded(
+                                  child: SliderTheme(
+                                    data: SliderThemeData(
+                                      activeTrackColor: AutomotiveColors.electricCyan,
+                                      inactiveTrackColor: AutomotiveColors.stroke,
+                                      thumbColor: AutomotiveColors.textPrimary,
+                                    ),
+                                    child: Slider(
+                                      value: display.brightness,
+                                      min: 0.1,
+                                      max: 1.0,
+                                      onChanged: (val) {
+                                        display.setBrightness(val);
+                                      },
+                                    ),
+                                  ),
                                 ),
-                                child: Slider(
-                                  value: _brightness,
-                                  onChanged: (val) {
-                                    setState(() => _brightness = val);
-                                  },
+                                Text(
+                                  "${display.brightnessPercent}%",
+                                  style: GoogleFonts.jetBrainsMono(color: AutomotiveColors.textPrimary, fontWeight: FontWeight.bold),
                                 ),
-                              ),
-                            ),
-                            Text(
-                              "${(_brightness * 100).toInt()}%",
-                              style: GoogleFonts.jetBrainsMono(color: AutomotiveColors.textPrimary, fontWeight: FontWeight.bold),
-                            ),
-                          ],
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -730,7 +749,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _buildAudioTargetRadioTile(
                           "AUX Cable / 3.5mm DAC",
                           Icons.headphones_rounded,
-                          "Plugged into Car AUX Input Port (Ground Loop Isolated)",
+                          "Plugged into Car AUX Input Port",
                         ),
                         _buildAudioTargetRadioTile(
                           "Car Bluetooth Stereo (A2DP)",
@@ -928,7 +947,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           contentPadding: EdgeInsets.zero,
                           leading: const Icon(Icons.memory_rounded, color: AutomotiveColors.nativeGreen),
                           title: Text("System Specifications & Diagnostics", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14)),
-                          subtitle: Text("HeadUnit OS v1.0.0 • Linux Kernel 6.6 • RPi 4/5 ARM64", style: GoogleFonts.jetBrainsMono(color: AutomotiveColors.textSecondary, fontSize: 11)),
+                          subtitle: FutureBuilder<SystemInfoData>(
+                            future: SystemInfoService.getRealSystemInfo(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) {
+                                return Text("Reading hardware info...", style: GoogleFonts.jetBrainsMono(color: AutomotiveColors.textSecondary, fontSize: 11));
+                              }
+                              final sys = snapshot.data!;
+                              return Text("${sys.hardwareModel} • ${sys.kernelVersion}", maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.jetBrainsMono(color: AutomotiveColors.textSecondary, fontSize: 11));
+                            },
+                          ),
                           trailing: OutlinedButton(
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AutomotiveColors.electricCyan,

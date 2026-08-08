@@ -3,6 +3,18 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/wifi_network.dart';
 
+class WifiConnectResult {
+  final bool success;
+  final String? errorMessage;
+  final bool isPermissionDenied;
+
+  const WifiConnectResult({
+    required this.success,
+    this.errorMessage,
+    this.isPermissionDenied = false,
+  });
+}
+
 /// System service for scanning, connecting, and managing Wi-Fi networks on Linux / Raspberry Pi via `nmcli`.
 class WifiService {
   static final WifiService _instance = WifiService._internal();
@@ -107,11 +119,11 @@ class WifiService {
   }
 
   /// Connect to a specific Wi-Fi network using SSID and optional password.
-  Future<bool> connectToNetwork(String ssid, String password) async {
+  Future<WifiConnectResult> connectToNetwork(String ssid, String password) async {
     if (!await isNmcliAvailable()) {
       if (kDebugMode) print('[WifiService] Simulator mode: Mocking connection to "$ssid"');
-      await Future.delayed(const Duration(seconds: 2));
-      return true;
+      await Future.delayed(const Duration(seconds: 1));
+      return const WifiConnectResult(success: true);
     }
 
     try {
@@ -123,14 +135,30 @@ class WifiService {
       final result = await Process.run('nmcli', args);
       if (result.exitCode == 0) {
         if (kDebugMode) print('[WifiService] Successfully connected to $ssid');
-        return true;
+        return const WifiConnectResult(success: true);
       } else {
-        if (kDebugMode) print('[WifiService] Failed to connect to $ssid: ${result.stderr}');
-        return false;
+        final stderr = result.stderr.toString();
+        if (kDebugMode) print('[WifiService] Failed to connect to $ssid: $stderr');
+        
+        if (stderr.contains('Not authorized to control networking')) {
+          return const WifiConnectResult(
+            success: false,
+            errorMessage: 'NetworkManager Permission Error: Run "sudo usermod -aG netdev \$USER" on Linux.',
+            isPermissionDenied: true,
+          );
+        }
+        
+        return WifiConnectResult(
+          success: false,
+          errorMessage: 'Failed to connect to "$ssid": ${stderr.trim()}',
+        );
       }
     } catch (e) {
       if (kDebugMode) print('[WifiService] Connect exception: $e');
-      return false;
+      return WifiConnectResult(
+        success: false,
+        errorMessage: 'Connect exception: $e',
+      );
     }
   }
 
