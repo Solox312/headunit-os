@@ -3,7 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/bluetooth_device.dart';
 
-/// System service for scanning, pairing, connecting, and managing Bluetooth devices on Linux / Raspberry Pi via `bluetoothctl`.
+/// System service for scanning, pairing, connecting, and managing Bluetooth devices
+/// on both Linux Mint (testing host) and Raspberry Pi OS via Linux BlueZ `bluetoothctl` & `rfkill`.
 class BluetoothService {
   static final BluetoothService _instance = BluetoothService._internal();
   factory BluetoothService() => _instance;
@@ -27,6 +28,29 @@ class BluetoothService {
     }
   }
 
+  /// Initialize Linux Mint & Raspberry Pi Bluetooth Stack (rfkill unblock + BlueZ agent setup)
+  Future<bool> initLinuxBluetooth() async {
+    if (!await isBluetoothctlAvailable()) return true;
+
+    try {
+      // 1. Unblock Bluetooth radio via rfkill (works on Linux Mint & RPi OS)
+      await Process.run('rfkill', ['unblock', 'bluetooth']);
+
+      // 2. Turn power on and set default agent
+      await Process.run('bluetoothctl', ['power', 'on']);
+      await Process.run('bluetoothctl', ['agent', 'NoInputNoOutput']);
+      await Process.run('bluetoothctl', ['default-agent']);
+      await Process.run('bluetoothctl', ['discoverable', 'on']);
+      await Process.run('bluetoothctl', ['pairable', 'on']);
+
+      if (kDebugMode) print('[BluetoothService] Initialized Linux Mint & RPi BlueZ stack.');
+      return true;
+    } catch (e) {
+      if (kDebugMode) print('[BluetoothService] Exception initializing Linux Bluetooth: $e');
+      return false;
+    }
+  }
+
   /// Check if Bluetooth adapter power is turned on.
   Future<bool> isPowerOn() async {
     if (!await isBluetoothctlAvailable()) return true;
@@ -45,6 +69,9 @@ class BluetoothService {
   Future<bool> setPower(bool enabled) async {
     if (!await isBluetoothctlAvailable()) return true;
     try {
+      if (enabled) {
+        await Process.run('rfkill', ['unblock', 'bluetooth']);
+      }
       final result = await Process.run('bluetoothctl', ['power', enabled ? 'on' : 'off']);
       return result.exitCode == 0;
     } catch (e) {
@@ -94,14 +121,18 @@ class BluetoothService {
     }
   }
 
-  /// Scan for nearby Bluetooth devices.
+  /// Scan for nearby Bluetooth devices on Linux Mint / Raspberry Pi.
   Future<List<BluetoothDevice>> scanDevices() async {
     if (!await isBluetoothctlAvailable()) {
       return _getMockDiscoveredDevices();
     }
 
     try {
-      // Start background scan for 4 seconds
+      // Ensure bluetooth radio is unblocked and powered on
+      await Process.run('rfkill', ['unblock', 'bluetooth']);
+      await Process.run('bluetoothctl', ['power', 'on']);
+
+      // Perform a 4-second discovery scan
       final process = await Process.start('bluetoothctl', ['scan', 'on']);
       await Future.delayed(const Duration(seconds: 4));
       process.kill();
@@ -130,11 +161,15 @@ class BluetoothService {
   Future<bool> pairAndConnect(String macAddress) async {
     if (!await isBluetoothctlAvailable()) {
       if (kDebugMode) print('[BluetoothService] Simulator: Mocking pair & connect to $macAddress');
-      await Future.delayed(const Duration(seconds: 2));
+      await Future.delayed(const Duration(seconds: 1));
       return true;
     }
 
     try {
+      await Process.run('bluetoothctl', ['agent', 'NoInputNoOutput']);
+      await Process.run('bluetoothctl', ['default-agent']);
+      await Process.run('bluetoothctl', ['power', 'on']);
+
       await Process.run('bluetoothctl', ['pair', macAddress]);
       await Process.run('bluetoothctl', ['trust', macAddress]);
       final connResult = await Process.run('bluetoothctl', ['connect', macAddress]);

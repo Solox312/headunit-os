@@ -1,57 +1,62 @@
-# Raspberry Pi & Linux Bluetooth Setup Guide 📶⚡
+# Linux Mint & Raspberry Pi Bluetooth Setup Guide 📶
 
-This guide documents how **HeadUnit OS** interfaces with Linux BlueZ (`bluetoothctl`) and PulseAudio / PipeWire to enable Bluetooth device scanning, pairing, A2DP audio streaming, and hands-free phone connection.
-
----
-
-## 1. Linux BlueZ Prerequisites
-
-Verify that the BlueZ daemon (`bluetoothd`) and `bluetoothctl` CLI are active on your system:
-
-```bash
-sudo systemctl status bluetooth
-bluetoothctl show
-```
-
-Output should indicate:
-```
-Powered: yes
-Discoverable: yes
-Pairable: yes
-```
+This guide details how **HeadUnit OS** interfaces with Linux BlueZ (`bluetoothctl`), `rfkill`, and PulseAudio/Pipewire on **Linux Mint** (desktop testing host) and **Raspberry Pi OS** for A2DP audio streaming and wireless projection.
 
 ---
 
-## 2. A2DP Audio Sink Setup (PulseAudio / PipeWire)
+## 1. Linux Bluetooth Prerequisites
 
-To allow phones (Android / iPhone) to stream high-quality A2DP stereo audio directly to HeadUnit OS, ensure `pulseaudio-module-bluetooth` or `pipewire-audio-client-libraries` is installed:
+Both **Linux Mint** and **Raspberry Pi OS** use the official Linux **BlueZ 5.x** Bluetooth daemon.
+
+Ensure BlueZ and `bluetoothctl` are installed and active:
 
 ```bash
 sudo apt update
-sudo apt install -y pulseaudio-module-bluetooth bluez-tools
+sudo apt install -y bluez rfkill pulseaudio-module-bluetooth
+sudo systemctl enable --now bluetooth
 ```
 
-Restart PulseAudio:
+Verify Bluetooth adapter status:
 ```bash
-pulseaudio -k
-pulseaudio --start
+rfkill list bluetooth
+bluetoothctl show
 ```
 
 ---
 
-## 3. Bluetooth Pairability & Wireless Android Auto / CarPlay Handshake
+## 2. Linux Mint Desktop Testing & Raspberry Pi OS Setup
 
-1. Open **Bluetooth Manager** from the HeadUnit OS dock navigation bar.
-2. Ensure **Make Discoverable** is toggled **ON**.
-3. On your phone, go to **Settings -> Bluetooth** and tap **RPi-HeadUnit** to initiate pairing.
-4. Once paired, HeadUnit OS automatically establishes:
-   * **A2DP Audio Sink**: Streams music from your phone to car audio targets (AUX / Bluetooth / FM Transmitter).
-   * **RFCOMM Channel**: Transmits Wi-Fi Access Point credentials for Wireless Android Auto / Apple CarPlay.
+### Step 1: Unblock & Power On Bluetooth Adapter
+```bash
+sudo rfkill unblock bluetooth
+bluetoothctl power on
+```
+
+### Step 2: Set HeadUnit OS as Discoverable & Pairable Receiver
+```bash
+bluetoothctl discoverable on
+bluetoothctl pairable on
+bluetoothctl agent NoInputNoOutput
+bluetoothctl default-agent
+```
+
+### Step 3: Connect Car Receiver / Phone
+You can scan, pair, and connect directly inside the **HeadUnit OS Settings** screen or via CLI:
+```bash
+bluetoothctl scan on
+bluetoothctl pair <MAC_ADDRESS>
+bluetoothctl trust <MAC_ADDRESS>
+bluetoothctl connect <MAC_ADDRESS>
+```
 
 ---
 
-## 4. Troubleshooting Bluetooth Issues
+## 3. PulseAudio / PipeWire A2DP Audio Sink Configuration
 
-* **Bluetooth Adapter Soft-Locked**: Run `sudo rfkill unblock bluetooth`.
-* **Pairing Rejected**: Remove old pairing keys on Linux by running `bluetoothctl remove <PHONE_MAC>` and retry pairing.
-* **Audio Not Playing**: Check `pavucontrol` or set active audio sink using `pacmd set-default-sink`.
+When connected to a Car Bluetooth stereo or phone, set the Bluetooth audio profile to A2DP Sink:
+
+```bash
+pactl set-card-profile bluez_card.<MAC_WITH_UNDERSCORES> a2dp_sink
+```
+
+HeadUnit OS automatically routes all audio output through the active A2DP Bluetooth sink when **Car Bluetooth Stereo (A2DP)** is selected in Settings.

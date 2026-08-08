@@ -36,6 +36,7 @@ class BluetoothProvider extends ChangeNotifier {
   }
 
   Future<void> init() async {
+    await _service.initLinuxBluetooth();
     _isBluetoothEnabled = await _service.isPowerOn();
     if (_isBluetoothEnabled) {
       await refreshPairedDevices();

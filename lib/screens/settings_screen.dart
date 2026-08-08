@@ -8,6 +8,7 @@ import '../providers/wifi_provider.dart';
 import '../providers/bluetooth_provider.dart';
 import '../providers/fm_transmitter_provider.dart';
 import '../providers/display_provider.dart';
+import '../providers/keyboard_provider.dart';
 import '../services/fm_transmitter_service.dart';
 import '../services/system_info_service.dart';
 import '../models/projection_state.dart';
@@ -131,6 +132,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     controller: passwordController,
                     obscureText: obscureText,
                     autofocus: true,
+                    readOnly: false,
+                    onTap: () {
+                      context.read<KeyboardProvider>().show(
+                        passwordController,
+                        onSubmitted: () {},
+                      );
+                    },
                     style: GoogleFonts.inter(color: AutomotiveColors.textPrimary),
                     decoration: InputDecoration(
                       hintText: "Wi-Fi Password",
@@ -144,6 +152,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: const BorderSide(color: AutomotiveColors.stroke, width: 1.0),
+                      ),
+                      prefixIcon: IconButton(
+                        icon: const Icon(Icons.keyboard_rounded, color: AutomotiveColors.electricCyan),
+                        onPressed: () {
+                          context.read<KeyboardProvider>().show(
+                            passwordController,
+                            onSubmitted: () {},
+                          );
+                        },
                       ),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -162,7 +179,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    context.read<KeyboardProvider>().hide();
+                    Navigator.pop(context);
+                  },
                   child: Text(
                     "Cancel",
                     style: GoogleFonts.inter(color: AutomotiveColors.textSecondary),
@@ -176,6 +196,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   onPressed: () async {
                     final pwd = passwordController.text.trim();
+                    context.read<KeyboardProvider>().hide();
                     Navigator.pop(context);
                     await wifi.connectToNetwork(network.ssid, pwd);
                   },
