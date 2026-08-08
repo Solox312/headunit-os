@@ -24,15 +24,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: AutomotiveColors.cardBackground,
+          backgroundColor: AutomotiveColors.glassPanel,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: AutomotiveColors.stroke, width: 1.0),
+          ),
           title: Text(
             "Select Audio Output Target",
-            style: GoogleFonts.orbitron(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            style: GoogleFonts.spaceGrotesk(color: AutomotiveColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildAudioTargetOption("AUX Cable / 3.5mm DAC", Icons.cable_rounded, "Plugged into Car AUX Input Port"),
+              _buildAudioTargetOption("AUX Cable / 3.5mm DAC", Icons.headphones_rounded, "Plugged into Car AUX Input Port (Ground Loop Isolated)"),
               _buildAudioTargetOption("Car Bluetooth Stereo (A2DP)", Icons.bluetooth_audio_rounded, "Wireless stream to Car's Factory Bluetooth"),
               _buildAudioTargetOption("FM Transmitter (88.3 MHz)", Icons.radio_rounded, "Broadcast to Car's FM Radio Frequency"),
               _buildAudioTargetOption("HDMI Display Speakers", Icons.tv_rounded, "Built-in monitor speakers"),
@@ -41,7 +45,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Close", style: TextStyle(color: AutomotiveColors.cyanAccent)),
+              child: Text(
+                "Close",
+                style: GoogleFonts.inter(color: AutomotiveColors.electricCyan, fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         );
@@ -53,10 +60,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final bool isSelected = _audioOutputTarget == target;
 
     return ListTile(
-      leading: Icon(icon, color: isSelected ? AutomotiveColors.cyanAccent : Colors.white70),
-      title: Text(target, style: TextStyle(color: isSelected ? AutomotiveColors.cyanAccent : Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-      subtitle: Text(subtitle, style: const TextStyle(color: AutomotiveColors.textSecondary, fontSize: 11)),
-      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AutomotiveColors.cyanAccent) : null,
+      leading: Icon(icon, color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.textSecondary),
+      title: Text(
+        target,
+        style: GoogleFonts.inter(
+          color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.textPrimary,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          fontSize: 14,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11),
+      ),
+      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AutomotiveColors.electricCyan) : null,
       onTap: () {
         setState(() {
           _audioOutputTarget = target;
@@ -77,11 +94,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Text(
               "HEAD UNIT SYSTEM SETTINGS",
-              style: GoogleFonts.orbitron(
-                fontSize: 16,
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: AutomotiveColors.textPrimary,
-                letterSpacing: 1.2,
+                letterSpacing: -0.3,
               ),
             ),
             const SizedBox(height: 16),
@@ -94,24 +111,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         Text(
                           "Display & Brightness",
-                          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
                         ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
-                            const Icon(Icons.brightness_medium_rounded, color: AutomotiveColors.cyanAccent),
+                            const Icon(Icons.brightness_medium_rounded, color: AutomotiveColors.electricCyan),
                             const SizedBox(width: 12),
-                            Text("Screen Brightness", style: GoogleFonts.inter(fontSize: 14, color: Colors.white70)),
+                            Text("Screen Brightness", style: GoogleFonts.inter(fontSize: 14, color: AutomotiveColors.textPrimary)),
                             Expanded(
-                              child: Slider(
-                                value: _brightness,
-                                activeColor: AutomotiveColors.cyanAccent,
-                                onChanged: (val) {
-                                  setState(() => _brightness = val);
-                                },
+                              child: SliderTheme(
+                                data: SliderThemeData(
+                                  activeTrackColor: AutomotiveColors.electricCyan,
+                                  inactiveTrackColor: AutomotiveColors.stroke,
+                                  thumbColor: AutomotiveColors.textPrimary,
+                                ),
+                                child: Slider(
+                                  value: _brightness,
+                                  onChanged: (val) {
+                                    setState(() => _brightness = val);
+                                  },
+                                ),
                               ),
                             ),
-                            Text("${(_brightness * 100).toInt()}%", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            Text(
+                              "${(_brightness * 100).toInt()}%",
+                              style: GoogleFonts.jetBrainsMono(color: AutomotiveColors.textPrimary, fontWeight: FontWeight.bold),
+                            ),
                           ],
                         ),
                       ],
@@ -124,7 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         Text(
                           "Connectivity & Receiver Engine",
-                          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
                         ),
                         const SizedBox(height: 8),
                         Consumer<ProjectionProvider>(
@@ -137,41 +163,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               child: Column(
                                 children: [
                                   RadioListTile<ProjectionEngineType>(
-                                    title: const Text("Auto-Detect Engine (Recommended)", style: TextStyle(color: Colors.white, fontSize: 14)),
-                                    subtitle: const Text("Uses USB Hardware Dongle if plugged in, otherwise falls back to Native Software Wireless", style: TextStyle(color: AutomotiveColors.textSecondary, fontSize: 11)),
+                                    title: Text("Auto-Detect Engine (Recommended)", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                                    subtitle: Text("Uses USB Hardware Dongle if plugged in, otherwise falls back to Native Software Wireless", style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11)),
                                     value: ProjectionEngineType.autoDetect,
-                                    activeColor: AutomotiveColors.cyanAccent,
+                                    activeColor: AutomotiveColors.electricCyan,
                                   ),
                                   RadioListTile<ProjectionEngineType>(
-                                    title: const Text("100% Native Software Engine (No Dongle)", style: TextStyle(color: Colors.white, fontSize: 14)),
-                                    subtitle: const Text("Native RPi Bluetooth RFCOMM + 5GHz Wi-Fi Access Point engine", style: TextStyle(color: AutomotiveColors.textSecondary, fontSize: 11)),
+                                    title: Text("100% Native Software Engine (No Dongle - \$0)", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                                    subtitle: Text("Native RPi Bluetooth RFCOMM + 5GHz Wi-Fi Access Point engine", style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11)),
                                     value: ProjectionEngineType.nativeSoftware,
-                                    activeColor: AutomotiveColors.cyanAccent,
+                                    activeColor: AutomotiveColors.nativeGreen,
                                   ),
                                   RadioListTile<ProjectionEngineType>(
-                                    title: const Text("Carlinkit USB Hardware Dongle", style: TextStyle(color: Colors.white, fontSize: 14)),
-                                    subtitle: const Text("Dedicated dual-chip hardware bridge (CarPlay & Android Auto)", style: TextStyle(color: AutomotiveColors.textSecondary, fontSize: 11)),
+                                    title: Text("Carlinkit USB Hardware Dongle", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                                    subtitle: Text("Dedicated dual-chip hardware bridge (CarPlay & Android Auto)", style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11)),
                                     value: ProjectionEngineType.carlinkitHardware,
-                                    activeColor: AutomotiveColors.cyanAccent,
+                                    activeColor: AutomotiveColors.dongleViolet,
                                   ),
                                 ],
                               ),
                             );
                           },
                         ),
-                        const Divider(color: AutomotiveColors.cardBorder),
+                        const Divider(color: AutomotiveColors.strokeSoft),
                         SwitchListTile(
-                          title: const Text("Wireless CarPlay & Android Auto Hotspot", style: TextStyle(color: Colors.white)),
-                          subtitle: const Text("RPi 5GHz Wi-Fi Access Point enabled", style: TextStyle(color: AutomotiveColors.textSecondary, fontSize: 12)),
+                          title: Text("Wireless CarPlay & Android Auto Hotspot", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14)),
+                          subtitle: Text("RPi 5GHz Wi-Fi Access Point enabled", style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11)),
                           value: _wirelessHotspot,
-                          activeThumbColor: AutomotiveColors.cyanAccent,
+                          activeThumbColor: AutomotiveColors.electricCyan,
                           onChanged: (val) => setState(() => _wirelessHotspot = val),
                         ),
                         SwitchListTile(
-                          title: const Text("Auto-Connect Last Paired Device", style: TextStyle(color: Colors.white)),
-                          subtitle: const Text("Automatically connect wirelessly via Bluetooth & Wi-Fi on car start", style: TextStyle(color: AutomotiveColors.textSecondary, fontSize: 12)),
+                          title: Text("Auto-Connect Last Paired Device", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14)),
+                          subtitle: Text("Automatically connect wirelessly via Bluetooth & Wi-Fi on car start", style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11)),
                           value: _autoConnect,
-                          activeThumbColor: AutomotiveColors.cyanAccent,
+                          activeThumbColor: AutomotiveColors.electricCyan,
                           onChanged: (val) => setState(() => _autoConnect = val),
                         ),
                       ],
@@ -184,19 +210,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         Text(
                           "Audio & System Info",
-                          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
                         ),
                         ListTile(
-                          leading: const Icon(Icons.speaker_group_rounded, color: AutomotiveColors.blueAccent),
-                          title: const Text("Audio Output Target", style: TextStyle(color: Colors.white)),
-                          subtitle: Text(_audioOutputTarget, style: const TextStyle(color: AutomotiveColors.textSecondary, fontSize: 12)),
-                          trailing: const Icon(Icons.tune_rounded, color: AutomotiveColors.cyanAccent),
+                          leading: const Icon(Icons.headphones_rounded, color: AutomotiveColors.dongleViolet),
+                          title: Text("Audio Output Target", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14)),
+                          subtitle: Text(_audioOutputTarget, style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11)),
+                          trailing: const Icon(Icons.tune_rounded, color: AutomotiveColors.electricCyan),
                           onTap: _showAudioOutputDialog,
                         ),
-                        const ListTile(
-                          leading: Icon(Icons.developer_board_rounded, color: AutomotiveColors.greenAccent),
-                          title: Text("Raspberry Pi Hardware", style: TextStyle(color: Colors.white)),
-                          subtitle: Text("Raspberry Pi 4 / 5 (64-bit Linux Kernel 6.6)", style: TextStyle(color: AutomotiveColors.textSecondary, fontSize: 12)),
+                        ListTile(
+                          leading: const Icon(Icons.developer_board_rounded, color: AutomotiveColors.nativeGreen),
+                          title: Text("Raspberry Pi Hardware", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14)),
+                          subtitle: Text("Raspberry Pi 4 / 5 (64-bit Linux Kernel 6.6)", style: GoogleFonts.jetBrainsMono(color: AutomotiveColors.textMuted, fontSize: 11)),
                         ),
                       ],
                     ),

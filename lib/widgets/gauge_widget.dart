@@ -19,7 +19,7 @@ class GaugeWidget extends StatelessWidget {
     this.maxValue = 120.0,
     required this.title,
     required this.unit,
-    this.accentColor = AutomotiveColors.cyanAccent,
+    this.accentColor = AutomotiveColors.electricCyan,
     this.size = 200.0,
   });
 
@@ -45,26 +45,27 @@ class GaugeWidget extends StatelessWidget {
             children: [
               Text(
                 title.toUpperCase(),
-                style: GoogleFonts.inter(
-                  fontSize: size * 0.07,
-                  fontWeight: FontWeight.w600,
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: size * 0.065,
+                  fontWeight: FontWeight.w500,
                   color: AutomotiveColors.textSecondary,
-                  letterSpacing: 1.2,
+                  letterSpacing: 1.0,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 value.toInt().toString(),
-                style: GoogleFonts.orbitron(
-                  fontSize: size * 0.24,
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: size * 0.25,
                   fontWeight: FontWeight.bold,
                   color: AutomotiveColors.textPrimary,
+                  letterSpacing: -0.5,
                 ),
               ),
               Text(
                 unit,
-                style: GoogleFonts.inter(
-                  fontSize: size * 0.07,
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: size * 0.065,
                   fontWeight: FontWeight.w500,
                   color: accentColor,
                 ),
@@ -93,9 +94,9 @@ class _GaugePainter extends CustomPainter {
 
     // Background track arc
     final bgPaint = Paint()
-      ..color = AutomotiveColors.cardBorder
+      ..color = AutomotiveColors.stroke
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
+      ..strokeWidth = 8
       ..strokeCap = StrokeCap.round;
 
     canvas.drawArc(
@@ -113,7 +114,7 @@ class _GaugePainter extends CustomPainter {
         transform: const GradientRotation(startAngle),
       ).createShader(Rect.fromCircle(center: center, radius: radius))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 12
+      ..strokeWidth = 10
       ..strokeCap = StrokeCap.round;
 
     canvas.drawArc(
@@ -126,7 +127,7 @@ class _GaugePainter extends CustomPainter {
 
     // Tick marks
     final tickPaint = Paint()
-      ..color = AutomotiveColors.textMuted
+      ..color = AutomotiveColors.strokeSoft
       ..strokeWidth = 1.5;
 
     for (int i = 0; i <= 10; i++) {

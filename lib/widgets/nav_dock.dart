@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import '../theme/automotive_colors.dart';
@@ -50,112 +51,149 @@ class _NavDockState extends State<NavDock> {
     final projection = Provider.of<ProjectionProvider>(context);
 
     return Container(
-      width: 96,
+      width: 98,
       decoration: const BoxDecoration(
-        color: Color(0xFF090C12),
+        color: AutomotiveColors.background,
         border: Border(
-          right: BorderSide(color: AutomotiveColors.cardBorder, width: 1.5),
+          right: BorderSide(color: AutomotiveColors.strokeSoft, width: 1.0),
         ),
       ),
       child: Column(
         children: [
           const SizedBox(height: 16),
-          // Vehicle Logo / Home Icon
-          IconButton(
-            iconSize: 32,
-            icon: const Icon(Icons.drive_eta_rounded, color: AutomotiveColors.cyanAccent),
-            onPressed: () => widget.onDestinationSelected(0), // Home
+          // Brand Logo Badge & Wordmark
+          InkWell(
+            onTap: () => widget.onDestinationSelected(0),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AutomotiveColors.glassPanel,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AutomotiveColors.stroke, width: 1.0),
+                boxShadow: [
+                  BoxShadow(
+                    color: AutomotiveColors.electricCyan.withValues(alpha: 0.2),
+                    blurRadius: 16,
+                    spreadRadius: -4,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.directions_car_filled_rounded,
+                color: AutomotiveColors.electricCyan,
+                size: 24,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "HeadUnit OS",
+            textAlign: TextAlign.center,
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: AutomotiveColors.textPrimary,
+              letterSpacing: -0.2,
+            ),
           ),
           const SizedBox(height: 8),
+          // Data Monospace Clock
           Text(
             _currentTime,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
               color: AutomotiveColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 16),
-          const Divider(color: AutomotiveColors.cardBorder, height: 1, indent: 12, endIndent: 12),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+          const Divider(color: AutomotiveColors.strokeSoft, height: 1, indent: 14, endIndent: 14),
+          const SizedBox(height: 14),
 
-          // Main Navigation Items
+          // Main Navigation Items (64px Automotive Touch Area)
           Expanded(
-            child: Column(
-              children: [
-                _buildNavItem(
-                  index: 0,
-                  icon: Icons.dashboard_rounded,
-                  label: "Home",
-                ),
-                const SizedBox(height: 16),
-                _buildNavItem(
-                  index: 1,
-                  icon: Icons.phone_android_rounded,
-                  label: projection.state.mode == ProjectionMode.appleCarPlay
-                      ? "CarPlay"
-                      : (projection.state.mode == ProjectionMode.androidAuto ? "AA Stream" : "Projection"),
-                  badgeColor: projection.state.mode == ProjectionMode.appleCarPlay
-                      ? AutomotiveColors.carPlayColor
-                      : (projection.state.mode == ProjectionMode.androidAuto
-                          ? AutomotiveColors.androidAutoColor
-                          : AutomotiveColors.cyanAccent),
-                ),
-                const SizedBox(height: 16),
-                _buildNavItem(
-                  index: 2,
-                  icon: Icons.music_note_rounded,
-                  label: "Media",
-                ),
-                const SizedBox(height: 16),
-                _buildNavItem(
-                  index: 3,
-                  icon: Icons.speed_rounded,
-                  label: "Gauges",
-                ),
-                const SizedBox(height: 16),
-                _buildNavItem(
-                  index: 4,
-                  icon: Icons.settings_rounded,
-                  label: "Settings",
-                ),
-              ],
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildNavItem(
+                    index: 0,
+                    icon: Icons.grid_view_rounded,
+                    label: "Home",
+                  ),
+                  const SizedBox(height: 12),
+                  _buildNavItem(
+                    index: 1,
+                    icon: Icons.layers_rounded,
+                    label: projection.state.mode == ProjectionMode.appleCarPlay
+                        ? "CarPlay"
+                        : (projection.state.mode == ProjectionMode.androidAuto ? "AA Stream" : "Projection"),
+                    badgeColor: projection.state.mode == ProjectionMode.appleCarPlay
+                        ? AutomotiveColors.carPlayColor
+                        : (projection.state.mode == ProjectionMode.androidAuto
+                            ? AutomotiveColors.androidAutoColor
+                            : AutomotiveColors.electricCyan),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildNavItem(
+                    index: 2,
+                    icon: Icons.headphones_rounded,
+                    label: "Media",
+                  ),
+                  const SizedBox(height: 12),
+                  _buildNavItem(
+                    index: 3,
+                    icon: Icons.speed_rounded,
+                    label: "Gauges",
+                  ),
+                  const SizedBox(height: 12),
+                  _buildNavItem(
+                    index: 4,
+                    icon: Icons.settings_rounded,
+                    label: "Settings",
+                  ),
+                ],
+              ),
             ),
           ),
 
-          // Voice Assistant / Siri / Google Assistant Button
+          // Voice Assistant / Siri / Google Assistant 52px Badge Button
           Container(
-            margin: const EdgeInsets.only(bottom: 20),
+            margin: const EdgeInsets.only(bottom: 16),
             child: InkWell(
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Voice Assistant Triggered (Siri / Google Assistant)"),
-                    duration: Duration(seconds: 2),
-                    backgroundColor: AutomotiveColors.cyanAccent,
+                  SnackBar(
+                    content: Text(
+                      "Voice Assistant Triggered (Siri / Google Assistant)",
+                      style: GoogleFonts.jetBrainsMono(color: Colors.black, fontWeight: FontWeight.bold),
+                    ),
+                    duration: const Duration(seconds: 2),
+                    backgroundColor: AutomotiveColors.electricCyan,
                   ),
                 );
               },
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(14),
               child: Container(
-                padding: const EdgeInsets.all(12),
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [AutomotiveColors.cyanAccent, AutomotiveColors.blueAccent],
-                  ),
+                  color: AutomotiveColors.glassPanel,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AutomotiveColors.electricCyan, width: 1.0),
                   boxShadow: [
                     BoxShadow(
-                      color: AutomotiveColors.cyanAccent.withValues(alpha: 0.4),
-                      blurRadius: 10,
-                      spreadRadius: 2,
+                      color: AutomotiveColors.electricCyan.withValues(alpha: 0.3),
+                      blurRadius: 20,
+                      spreadRadius: -2,
                     ),
                   ],
                 ),
                 child: const Icon(
                   Icons.mic_rounded,
-                  color: Colors.black,
-                  size: 26,
+                  color: AutomotiveColors.electricCyan,
+                  size: 24,
                 ),
               ),
             ),
@@ -172,20 +210,21 @@ class _NavDockState extends State<NavDock> {
     Color? badgeColor,
   }) {
     final bool isSelected = widget.selectedIndex == index;
+    final Color activeColor = badgeColor ?? AutomotiveColors.electricCyan;
 
     return InkWell(
       onTap: () => widget.onDestinationSelected(index),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 72,
+        duration: const Duration(milliseconds: 180),
+        width: 76,
         height: 64,
         decoration: BoxDecoration(
-          color: isSelected ? (badgeColor ?? AutomotiveColors.cyanAccent).withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
+          color: isSelected ? activeColor.withValues(alpha: 0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? (badgeColor ?? AutomotiveColors.cyanAccent) : Colors.transparent,
-            width: 1.5,
+            color: isSelected ? activeColor : Colors.transparent,
+            width: 1.0,
           ),
         ),
         child: Column(
@@ -193,21 +232,25 @@ class _NavDockState extends State<NavDock> {
           children: [
             Icon(
               icon,
-              color: isSelected
-                  ? (badgeColor ?? AutomotiveColors.cyanAccent)
-                  : AutomotiveColors.textSecondary,
-              size: 26,
+              color: isSelected ? activeColor : AutomotiveColors.textSecondary,
+              size: 24,
             ),
             const SizedBox(height: 4),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected
-                    ? AutomotiveColors.textPrimary
-                    : AutomotiveColors.textMuted,
-              ),
+              style: isSelected
+                  ? GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AutomotiveColors.textPrimary,
+                    )
+                  : GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.normal,
+                      color: AutomotiveColors.textSecondary,
+                    ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

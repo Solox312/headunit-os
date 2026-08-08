@@ -23,10 +23,19 @@ This guide provides step-by-step instructions for physically assembling, wiring,
                           ┌──────────────────────────────────────────────┘            │           └─────────────────────────────────────────────┐
                           │ USB Audio                                                 │ USB Power                                               │ USB Dongle
                           ▼                                                           ▼                                                         ▼
-       ┌─────────────────────────────────────┐                     ┌────────────────────────────────────┐                    ┌─────────────────────────────────────┐
-       │ USB 3.5mm Hi-Fi DAC Audio Adapter   │                     │ 12V-to-5V Power Supply Converter   │                    │ Carlinkit Wireless USB Dongle       │
-       │ (Plugs into Car's AUX Input Port)   │                     │ (Car Outlet or Fuse Tap)           │                    │ (Tucked behind dashboard)           │
-       └─────────────────────────────────────┘                     └────────────────────────────────────┘                    └─────────────────────────────────────┘
+        ┌─────────────────────────────────────┐                     ┌────────────────────────────────────┐                    ┌─────────────────────────────────────┐
+        │ USB 3.5mm Hi-Fi DAC Audio Adapter   │                     │ 12V-to-5V Power Supply Converter   │                    │ Carlinkit Wireless USB Dongle       │
+        └──────────────────┬──────────────────┘                     │ (Car Outlet or Fuse Tap)           │                    │ (Tucked behind dashboard)           │
+                           │ 3.5mm Aux Cable                        └────────────────────────────────────┘                    └─────────────────────────────────────┘
+                           ▼
+        ┌─────────────────────────────────────┐
+        │ 3.5mm Ground Loop Noise Isolator    │ ⚡ (Eliminates Alternator Whine)
+        └──────────────────┬──────────────────┘
+                           │ 3.5mm Jack
+                           ▼
+        ┌─────────────────────────────────────┐
+        │ Car's AUX Input Port                │
+        └─────────────────────────────────────┘
 ```
 
 ---
@@ -47,26 +56,46 @@ This guide provides step-by-step instructions for physically assembling, wiring,
 
 ---
 
-### Step 2: Power Supply Installation (Car 12V)
+### Step 2: Power Supply Installation & Safe Shutdown
 
-#### **Method A: 12V Cigarette Lighter Outlet (Easiest — Plug & Play)**
+> [!CAUTION]
+> **Preventing Filesystem Corruption:** Simply unplugging or cutting 5V power to the Raspberry Pi when turning off the ignition is the **#1 cause of failed car Pi projects**. Abrupt power loss during background disk writes eventually corrupts the MicroSD card. Choose one of the power methods below.
+
+#### **Method 1: Intelligent Automotive Power HAT (Primary Standard — 100% Corruption Proof)**
+Use a dedicated automotive power supply HAT (**CarPiHAT**, **StromPi 3**, or **Mausberry Switch**):
+1. **Constant 12V (Battery)**: Connect to an unswitched battery fuse via Add-a-Fuse tap.
+2. **Switched 12V (ACC / Ignition)**: Connect to an ignition switched fuse via Add-a-Fuse tap.
+3. **Ground (GND)**: Connect to a bare metal chassis bolt.
+
+* **Graceful Shutdown Sequence**:
+  - Turning key **OFF** cuts power to the Switched 12V line.
+  - The HAT pulls GPIO 26 LOW while keeping Constant 12V power alive.
+  - The background `car-shutdown.service` (`scripts/shutdown_listener.py`) detects the LOW signal, holds 3 seconds to debounce engine cranking, and executes `sudo shutdown -h now`.
+  - Once the Pi safely halts, the HAT detects the halt state and cuts 5V power completely, avoiding battery drain!
+
+#### **Method B: Hardwiring 12V-to-5V Step-Down Converter (Clean Hidden Install)**
+1. Locate your car's interior fuse box (under dashboard / glove box).
+2. Insert an **Add-a-Fuse Tap** into an **ACC (Ignition Switched)** fuse slot.
+3. Crimp the **RED (+)** wire of a 12V-to-5V 5A DC converter to the Fuse Tap.
+4. Connect the **BLACK (-)** wire to a metal chassis bolt ground.
+5. **Crucial:** Enable **OverlayFS (Read-Only Mode)** in Raspberry Pi OS via `sudo raspi-config` so RAM handles all temporary writes and abrupt power loss will not corrupt the SD card.
+
+#### **Method C: 12V Cigarette Lighter Outlet (Easiest — Plug & Play)**
 1. Plug a **30W+ Dual USB-C Car Charger** into your car's 12V outlet.
 2. Run a **USB-C Cable** to the Raspberry Pi power port.
 3. Run a **Micro-USB Cable** to the 10.1" Display Driver Board power port.
-
-#### **Method B: Hardwiring Behind Dashboard (Clean Hidden Install)**
-1. Locate your car's interior fuse box (usually under the driver dashboard or glove box).
-2. Insert an **Add-a-Fuse Tap** into an **ACC (Ignition Switched)** fuse slot (e.g. Cigarette Lighter / Radio fuse).
-3. Crimp the **RED (+)** wire of a 12V-to-5V 5A DC converter to the Fuse Tap.
-4. Connect the **BLACK (-)** wire to a metal chassis bolt ground.
-5. Route the dual USB output cables up behind the radio cavity to power the Pi and screen.
+4. **Crucial:** Enable **OverlayFS (Read-Only Mode)** in Raspberry Pi OS via `sudo raspi-config`.
 
 ---
 
-### Step 3: Car Audio Wiring
+### Step 3: Car Audio Wiring & Ground Loop Isolation
 
 Choose your preferred audio method:
-* **Option A (AUX Cable)**: Plug the **USB 3.5mm DAC** into an RPi USB port, and run a 3.5mm Aux cable from the DAC into your car's AUX input port.
+* **Option A (AUX Cable)**: Plug the **USB 3.5mm DAC** into an RPi USB port, plug a **3.5mm Ground Loop Isolator** inline with the audio cable, and connect into your car's AUX input port.
+
+> [!IMPORTANT]
+> **Ground Loop Isolator (Crucial for AUX Audio)**: When you power the Raspberry Pi from the car's electrical system (12V cigarette lighter or hardwired DC converter) and plug directly into the car's Aux port, a ground loop is created between the Pi power ground and audio ground. This causes a high-pitched whining noise that gets louder as engine RPM rises (**alternator whine**). Inserting a inexpensive ~$8-$10 3.5mm Ground Loop Isolator inline with your Aux cable uses audio isolation transformers to 100% eliminate this hum/whine.
+
 * **Option B (Bluetooth A2DP)**: Pair the RPi to your car's factory Bluetooth stereo in **Settings -> Audio Target**.
 * **Option C (FM Transmitter)**: Plug a USB FM Transmitter into the Pi and set your car radio to `88.3 FM`.
 

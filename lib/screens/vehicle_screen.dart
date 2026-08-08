@@ -36,7 +36,7 @@ class VehicleScreen extends StatelessWidget {
                           maxValue: 140,
                           title: "Speed",
                           unit: "MPH",
-                          accentColor: AutomotiveColors.cyanAccent,
+                          accentColor: AutomotiveColors.electricCyan,
                           size: 190,
                         ),
                         GaugeWidget(
@@ -45,7 +45,7 @@ class VehicleScreen extends StatelessWidget {
                           maxValue: 8000,
                           title: "Engine",
                           unit: "RPM",
-                          accentColor: vehicle.status.rpm > 5500 ? AutomotiveColors.redAccent : AutomotiveColors.blueAccent,
+                          accentColor: vehicle.status.rpm > 5500 ? AutomotiveColors.redAccent : AutomotiveColors.dongleViolet,
                           size: 190,
                         ),
                       ],
@@ -64,18 +64,18 @@ class VehicleScreen extends StatelessWidget {
                             margin: const EdgeInsets.symmetric(horizontal: 6),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
-                              color: isSelected ? AutomotiveColors.cyanAccent : AutomotiveColors.cardBackground,
+                              color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.glassPanel,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: isSelected ? AutomotiveColors.cyanAccent : AutomotiveColors.cardBorder,
+                                color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.stroke,
                               ),
                             ),
                             child: Text(
                               gear.name,
-                              style: GoogleFonts.orbitron(
+                              style: GoogleFonts.spaceGrotesk(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: isSelected ? Colors.black : Colors.white70,
+                                color: isSelected ? Colors.black : AutomotiveColors.textPrimary,
                               ),
                             ),
                           ),
@@ -101,11 +101,11 @@ class VehicleScreen extends StatelessWidget {
                         children: [
                           Text(
                             "CLIMATE CONTROL",
-                            style: GoogleFonts.orbitron(
-                              fontSize: 14,
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                               color: AutomotiveColors.textSecondary,
-                              letterSpacing: 1.2,
+                              letterSpacing: 1.0,
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -115,13 +115,17 @@ class VehicleScreen extends StatelessWidget {
                               IconButton(
                                 icon: const Icon(Icons.remove_circle_outline_rounded),
                                 iconSize: 36,
-                                color: AutomotiveColors.blueAccent,
+                                color: AutomotiveColors.electricCyan,
                                 onPressed: () => vehicle.adjustClimateTemp(-1.0),
                               ),
                               const SizedBox(width: 12),
                               Text(
                                 "${vehicle.status.targetClimateTempF.toInt()}°F",
-                                style: GoogleFonts.orbitron(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
+                                style: GoogleFonts.spaceGrotesk(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  color: AutomotiveColors.textPrimary,
+                                ),
                               ),
                               const SizedBox(width: 12),
                               IconButton(
@@ -138,16 +142,16 @@ class VehicleScreen extends StatelessWidget {
                             children: [
                               IconButton(
                                 icon: Icon(Icons.ac_unit_rounded,
-                                    color: vehicle.status.headlightsOn ? AutomotiveColors.cyanAccent : Colors.white38),
+                                    color: vehicle.status.headlightsOn ? AutomotiveColors.electricCyan : AutomotiveColors.textMuted),
                                 onPressed: () {},
                               ),
                               IconButton(
                                 icon: Icon(Icons.light_mode_rounded,
-                                    color: vehicle.status.headlightsOn ? AutomotiveColors.cyanAccent : Colors.white38),
+                                    color: vehicle.status.headlightsOn ? AutomotiveColors.electricCyan : AutomotiveColors.textMuted),
                                 onPressed: () => vehicle.toggleHeadlights(),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.air_rounded, color: AutomotiveColors.cyanAccent),
+                                icon: const Icon(Icons.air_rounded, color: AutomotiveColors.electricCyan),
                                 onPressed: () {},
                               ),
                             ],
@@ -168,13 +172,13 @@ class VehicleScreen extends StatelessWidget {
                           icon: Icons.tire_repair_rounded,
                           title: "TIRES",
                           value: "${vehicle.status.tirePressurePsi.toInt()} PSI",
-                          color: AutomotiveColors.greenAccent,
+                          color: AutomotiveColors.nativeGreen,
                         ),
                         _buildVehicleTile(
                           icon: Icons.battery_charging_full_rounded,
                           title: "BATTERY",
                           value: "${vehicle.status.batteryVoltage} V",
-                          color: AutomotiveColors.cyanAccent,
+                          color: AutomotiveColors.electricCyan,
                         ),
                       ],
                     ),
@@ -196,13 +200,27 @@ class VehicleScreen extends StatelessWidget {
   }) {
     return Row(
       children: [
-        Icon(icon, color: color, size: 28),
+        Icon(icon, color: color, size: 26),
         const SizedBox(width: 10),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontSize: 10, color: AutomotiveColors.textMuted, fontWeight: FontWeight.bold)),
-            Text(value, style: GoogleFonts.orbitron(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(
+              title,
+              style: GoogleFonts.jetBrainsMono(
+                fontSize: 10,
+                color: AutomotiveColors.textMuted,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              value,
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: AutomotiveColors.textPrimary,
+              ),
+            ),
           ],
         ),
       ],

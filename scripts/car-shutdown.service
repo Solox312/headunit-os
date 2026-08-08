@@ -1,0 +1,12 @@
+[Unit]
+Description=Automotive Safe Shutdown Service for HeadUnit OS
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/pi/rpi_headunit/scripts/shutdown_listener.py
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target

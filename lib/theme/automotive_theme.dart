@@ -9,51 +9,69 @@ class AutomotiveTheme {
     return ThemeData.dark().copyWith(
       scaffoldBackgroundColor: AutomotiveColors.background,
       colorScheme: const ColorScheme.dark(
-        primary: AutomotiveColors.cyanAccent,
-        secondary: AutomotiveColors.blueAccent,
-        surface: AutomotiveColors.cardBackground,
+        primary: AutomotiveColors.electricCyan,
+        secondary: AutomotiveColors.dongleViolet,
+        surface: AutomotiveColors.glassPanel,
         error: AutomotiveColors.redAccent,
       ),
       cardTheme: CardThemeData(
-        color: AutomotiveColors.cardBackground,
+        color: AutomotiveColors.glassPanel,
         elevation: 4,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: AutomotiveColors.cardBorder, width: 1),
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: AutomotiveColors.stroke, width: 1),
         ),
       ),
       textTheme: baseTextTheme.copyWith(
-        headlineLarge: GoogleFonts.orbitron(
-          fontSize: 36,
+        // Display Headings - Space Grotesk (700 Bold)
+        headlineLarge: GoogleFonts.spaceGrotesk(
+          fontSize: 38,
           fontWeight: FontWeight.bold,
           color: AutomotiveColors.textPrimary,
-          letterSpacing: 1.2,
+          letterSpacing: -0.5,
         ),
-        headlineMedium: GoogleFonts.orbitron(
-          fontSize: 24,
-          fontWeight: FontWeight.w600,
+        headlineMedium: GoogleFonts.spaceGrotesk(
+          fontSize: 26,
+          fontWeight: FontWeight.bold,
           color: AutomotiveColors.textPrimary,
-          letterSpacing: 1.0,
+          letterSpacing: -0.3,
         ),
-        titleLarge: GoogleFonts.inter(
+        titleLarge: GoogleFonts.spaceGrotesk(
           fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: AutomotiveColors.textPrimary,
+        ),
+        // Subheads & Control Labels - Inter
+        titleMedium: GoogleFonts.inter(
+          fontSize: 16,
           fontWeight: FontWeight.w600,
           color: AutomotiveColors.textPrimary,
         ),
         bodyLarge: GoogleFonts.inter(
-          fontSize: 16,
+          fontSize: 15,
           fontWeight: FontWeight.normal,
           color: AutomotiveColors.textPrimary,
         ),
         bodyMedium: GoogleFonts.inter(
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: FontWeight.normal,
           color: AutomotiveColors.textSecondary,
         ),
+        // Data & Monospace Labels - JetBrains Mono
+        labelLarge: GoogleFonts.jetBrainsMono(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: AutomotiveColors.electricCyan,
+        ),
+        labelMedium: GoogleFonts.jetBrainsMono(
+          fontSize: 11,
+          fontWeight: FontWeight.normal,
+          color: AutomotiveColors.textMuted,
+        ),
       ),
       iconTheme: const IconThemeData(
-        color: AutomotiveColors.textPrimary,
-        size: 26,
+        color: AutomotiveColors.electricCyan,
+        size: 24,
       ),
     );
   }

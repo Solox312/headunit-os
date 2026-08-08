@@ -24,10 +24,10 @@ class _ProjectionSimulatorCanvasState extends State<ProjectionSimulatorCanvas> {
     return Container(
       decoration: BoxDecoration(
         color: isCarPlay ? const Color(0xFF1C1C1E) : const Color(0xFF121212),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isCarPlay ? AutomotiveColors.carPlayColor : AutomotiveColors.androidAutoColor,
-          width: 2,
+          width: 1.5,
         ),
       ),
       child: ClipRRect(
@@ -52,7 +52,7 @@ class _ProjectionSimulatorCanvasState extends State<ProjectionSimulatorCanvas> {
                 right: 0,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  color: Colors.black.withValues(alpha: 0.55),
+                  color: Colors.black.withValues(alpha: 0.65),
                   child: Row(
                     children: [
                       Container(
@@ -63,7 +63,7 @@ class _ProjectionSimulatorCanvasState extends State<ProjectionSimulatorCanvas> {
                         ),
                         child: Text(
                           isCarPlay ? "CarPlay" : "Android Auto",
-                          style: const TextStyle(
+                          style: GoogleFonts.spaceGrotesk(
                             color: Colors.white,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -73,7 +73,7 @@ class _ProjectionSimulatorCanvasState extends State<ProjectionSimulatorCanvas> {
                       const SizedBox(width: 12),
                       Text(
                         state.deviceName,
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        style: GoogleFonts.inter(color: Colors.white70, fontSize: 12),
                       ),
                       const Spacer(),
                       Icon(
@@ -86,10 +86,10 @@ class _ProjectionSimulatorCanvasState extends State<ProjectionSimulatorCanvas> {
                       const SizedBox(width: 8),
                       Text(
                         "${state.phoneBatteryLevel}%",
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        style: GoogleFonts.jetBrainsMono(color: Colors.white70, fontSize: 11),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.battery_5_bar_rounded, color: Colors.greenAccent, size: 18),
+                      const Icon(Icons.battery_5_bar_rounded, color: AutomotiveColors.nativeGreen, size: 18),
                     ],
                   ),
                 ),
@@ -103,18 +103,18 @@ class _ProjectionSimulatorCanvasState extends State<ProjectionSimulatorCanvas> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.75),
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: Colors.white12),
+                    color: AutomotiveColors.panelDark.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AutomotiveColors.stroke),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildSimAppButton("Maps", Icons.map_rounded, Colors.green),
-                      _buildSimAppButton("Music", Icons.music_note_rounded, Colors.pinkAccent),
-                      _buildSimAppButton("Phone", Icons.phone_rounded, Colors.blue),
-                      _buildSimAppButton("Messages", Icons.chat_rounded, Colors.orangeAccent),
-                      _buildSimAppButton("Waze", Icons.navigation_rounded, Colors.cyan),
+                      _buildSimAppButton("Maps", Icons.map_rounded, AutomotiveColors.nativeGreen),
+                      _buildSimAppButton("Music", Icons.headphones_rounded, AutomotiveColors.dongleViolet),
+                      _buildSimAppButton("Phone", Icons.phone_rounded, AutomotiveColors.electricCyan),
+                      _buildSimAppButton("Messages", Icons.chat_rounded, AutomotiveColors.orangeAccent),
+                      _buildSimAppButton("Waze", Icons.navigation_rounded, AutomotiveColors.electricCyan),
                     ],
                   ),
                 ),
@@ -139,7 +139,7 @@ class _ProjectionSimulatorCanvasState extends State<ProjectionSimulatorCanvas> {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.3) : Colors.transparent,
+          color: isSelected ? color.withValues(alpha: 0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: isSelected ? color : Colors.transparent),
         ),
@@ -159,11 +159,11 @@ class _ProjectionSimulatorCanvasState extends State<ProjectionSimulatorCanvas> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.navigation_rounded, size: 64, color: AutomotiveColors.cyanAccent),
+                  const Icon(Icons.navigation_rounded, size: 64, color: AutomotiveColors.electricCyan),
                   const SizedBox(height: 12),
                   Text(
                     "Turn Right on Grand Ave in 300 ft",
-                    style: GoogleFonts.inter(
+                    style: GoogleFonts.spaceGrotesk(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -172,7 +172,7 @@ class _ProjectionSimulatorCanvasState extends State<ProjectionSimulatorCanvas> {
                   const SizedBox(height: 6),
                   Text(
                     "ETA: 14 mins • 5.8 mi remaining",
-                    style: GoogleFonts.inter(fontSize: 14, color: Colors.white70),
+                    style: GoogleFonts.jetBrainsMono(fontSize: 13, color: Colors.white70),
                   ),
                 ],
               ),
@@ -191,16 +191,16 @@ class _ProjectionSimulatorCanvasState extends State<ProjectionSimulatorCanvas> {
                 width: 140,
                 height: 140,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: const LinearGradient(colors: [Colors.purpleAccent, Colors.blueAccent]),
-                  boxShadow: const [BoxShadow(color: Colors.purpleAccent, blurRadius: 20)],
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(colors: [AutomotiveColors.dongleViolet, AutomotiveColors.electricCyan]),
+                  boxShadow: const [BoxShadow(color: AutomotiveColors.dongleViolet, blurRadius: 20)],
                 ),
                 child: const Icon(Icons.album_rounded, size: 80, color: Colors.white),
               ),
               const SizedBox(height: 16),
               Text(
                 "Starboy - The Weeknd",
-                style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                style: GoogleFonts.spaceGrotesk(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 8),
               const Row(
@@ -224,11 +224,11 @@ class _ProjectionSimulatorCanvasState extends State<ProjectionSimulatorCanvas> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.apps_rounded, size: 48, color: Colors.white70),
+              const Icon(Icons.apps_rounded, size: 48, color: Colors.white70),
               const SizedBox(height: 12),
               Text(
                 "$_selectedSimApp App Active",
-                style: GoogleFonts.inter(fontSize: 18, color: Colors.white),
+                style: GoogleFonts.spaceGrotesk(fontSize: 18, color: Colors.white),
               ),
             ],
           ),

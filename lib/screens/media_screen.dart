@@ -33,18 +33,18 @@ class MediaScreen extends StatelessWidget {
                           width: 220,
                           height: 220,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(14),
                             boxShadow: [
                               BoxShadow(
-                                color: AutomotiveColors.purpleAccent.withValues(alpha: 0.4),
-                                blurRadius: 30,
-                                spreadRadius: 5,
+                                color: AutomotiveColors.dongleViolet.withValues(alpha: 0.35),
+                                blurRadius: 36,
+                                spreadRadius: -2,
                               ),
                             ],
                           ),
                         ),
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(14),
                           child: Image.network(
                             item.coverUrl,
                             width: 210,
@@ -54,11 +54,11 @@ class MediaScreen extends StatelessWidget {
                               return Container(
                                 width: 210,
                                 height: 210,
-                                color: AutomotiveColors.cardBackground,
+                                color: AutomotiveColors.glassPanel,
                                 child: const Icon(
                                   Icons.album_rounded,
                                   size: 80,
-                                  color: AutomotiveColors.purpleAccent,
+                                  color: AutomotiveColors.dongleViolet,
                                 ),
                               );
                             },
@@ -66,18 +66,19 @@ class MediaScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
                     // Live Audio Equalizer Bar Animation
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(
-                        12,
-                        (index) => Container(
+                        14,
+                        (index) => AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
                           margin: const EdgeInsets.symmetric(horizontal: 3),
-                          width: 6,
-                          height: item.isPlaying ? (15 + (index % 5) * 8.0) : 6.0,
+                          width: 5,
+                          height: item.isPlaying ? (14 + (index % 5) * 7.0) : 6.0,
                           decoration: BoxDecoration(
-                            color: AutomotiveColors.cyanAccent,
+                            color: AutomotiveColors.electricCyan,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
@@ -102,17 +103,21 @@ class MediaScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: AutomotiveColors.surfaceGlass,
+                            color: AutomotiveColors.panelDark,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AutomotiveColors.cardBorder),
+                            border: Border.all(color: AutomotiveColors.stroke),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.bluetooth_audio_rounded, size: 14, color: AutomotiveColors.cyanAccent),
+                              const Icon(Icons.bluetooth_audio_rounded, size: 14, color: AutomotiveColors.electricCyan),
                               const SizedBox(width: 6),
                               Text(
                                 item.source,
-                                style: const TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.bold),
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 11,
+                                  color: AutomotiveColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
@@ -125,23 +130,30 @@ class MediaScreen extends StatelessWidget {
 
                     Text(
                       item.title,
-                      style: GoogleFonts.orbitron(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: AutomotiveColors.textPrimary,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       "${item.artist} — ${item.album}",
-                      style: GoogleFonts.inter(fontSize: 15, color: AutomotiveColors.textSecondary),
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        color: AutomotiveColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 24),
 
                     // Progress Bar
                     SliderTheme(
                       data: SliderThemeData(
-                        trackHeight: 6,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                        activeTrackColor: AutomotiveColors.cyanAccent,
-                        inactiveTrackColor: AutomotiveColors.cardBorder,
-                        thumbColor: Colors.white,
+                        trackHeight: 4,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        activeTrackColor: AutomotiveColors.electricCyan,
+                        inactiveTrackColor: AutomotiveColors.stroke,
+                        thumbColor: AutomotiveColors.textPrimary,
                       ),
                       child: Slider(
                         value: item.position.inSeconds.toDouble().clamp(0.0, item.duration.inSeconds.toDouble()),
@@ -156,8 +168,14 @@ class MediaScreen extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(_formatDuration(item.position), style: const TextStyle(fontSize: 12, color: AutomotiveColors.textMuted)),
-                          Text(_formatDuration(item.duration), style: const TextStyle(fontSize: 12, color: AutomotiveColors.textMuted)),
+                          Text(
+                            _formatDuration(item.position),
+                            style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AutomotiveColors.textMuted),
+                          ),
+                          Text(
+                            _formatDuration(item.duration),
+                            style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AutomotiveColors.textMuted),
+                          ),
                         ],
                       ),
                     ),
@@ -175,7 +193,8 @@ class MediaScreen extends StatelessWidget {
                         const SizedBox(width: 16),
                         IconButton(
                           icon: const Icon(Icons.skip_previous_rounded),
-                          iconSize: 40,
+                          iconSize: 36,
+                          color: AutomotiveColors.textPrimary,
                           onPressed: () => media.previousTrack(),
                         ),
                         const SizedBox(width: 16),
@@ -183,14 +202,15 @@ class MediaScreen extends StatelessWidget {
                           icon: Icon(item.isPlaying
                               ? Icons.pause_circle_filled_rounded
                               : Icons.play_circle_fill_rounded),
-                          iconSize: 58,
-                          color: AutomotiveColors.cyanAccent,
+                          iconSize: 56,
+                          color: AutomotiveColors.electricCyan,
                           onPressed: () => media.togglePlayPause(),
                         ),
                         const SizedBox(width: 16),
                         IconButton(
                           icon: const Icon(Icons.skip_next_rounded),
-                          iconSize: 40,
+                          iconSize: 36,
+                          color: AutomotiveColors.textPrimary,
                           onPressed: () => media.nextTrack(),
                         ),
                         const SizedBox(width: 16),

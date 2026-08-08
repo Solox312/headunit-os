@@ -146,3 +146,94 @@ hdmi_cvt=1280 800 60 6 0 0 0
 Connect the screen's **USB Touch cable** directly to one of the Raspberry Pi's USB ports. Raspberry Pi OS automatically detects capacitive touch panels as standard HID input devices without needing external touch drivers.
 
 Save and reboot your Raspberry Pi!
+
+---
+
+## 8. SD Card Corruption Protection & Safe Ignition Shutdown
+
+> [!WARNING]
+> **Preventing Filesystem Corruption:** Abruptly cutting power to a Raspberry Pi while the car ignition is turned off is the **#1 cause of failed car Pi projects**. Because Linux constantly writes logs and state files in the background, cutting power mid-write corrupts the MicroSD card.
+
+Use one of the two solutions below to ensure long-term reliability:
+
+### Method 1: Intelligent Hardware Power Supply HAT (Primary Standard)
+
+Use a dedicated automotive power supply HAT (such as **CarPiHAT**, **StromPi 3**, or **Mausberry Car Switch**).
+
+#### **3-Wire Wiring Connection (Fuse Box)**:
+1. **Constant 12V (Battery)**: Wired to an unswitched fuse for continuous power while sleeping.
+2. **Switched 12V (ACC / Ignition)**: Wired to an ignition-switched fuse (detects car key status).
+3. **Ground (GND)**: Connected to bare chassis metal bolt.
+
+#### **How Graceful Shutdown Works**:
+* Turning key **ON** ──► Switched 12V powers up HAT ──► HAT boots Raspberry Pi via Constant 12V line.
+* Turning key **OFF** ──► Switched 12V cuts ──► HAT sends GPIO LOW signal on pin (default: GPIO 26) to Pi while keeping 5V power alive.
+* Background `gpiozero` listener daemon on Pi waits 3 seconds (to debounce engine cranking / voltage dips) and executes `sudo shutdown -h now`.
+* Pi safely halts, and HAT detects halt state and cuts 5V power completely, avoiding battery drain!
+
+#### **Installing the Automotive Shutdown Service**:
+
+1. **Install `gpiozero` Python Library**:
+   ```bash
+   sudo apt update && sudo apt install -y python3-gpiozero
+   ```
+
+2. **Python Listener Script (`scripts/shutdown_listener.py`)**:
+   The repo includes an automated Python listener at `scripts/shutdown_listener.py`:
+   ```python
+   #!/usr/bin/env python3
+   import os
+   import time
+   from gpiozero import Button
+
+   IGNITION_PIN = 26 # Check your HAT manual for the BCM pin number
+
+   def trigger_shutdown():
+       print("Ignition loss detected (3s hold). Halting system safely...")
+       os.system("sudo shutdown -h now")
+
+   if __name__ == '__main__':
+       # hold_time=3 requires car key off for 3s (prevents accidental shutdown while cranking)
+       ignition_signal = Button(IGNITION_PIN, pull_up=True, hold_time=3)
+       ignition_signal.when_held = trigger_shutdown
+       
+       try:
+           while True:
+               time.sleep(1)
+       except KeyboardInterrupt:
+           pass
+   ```
+
+3. **Configure & Enable `systemd` Service**:
+   Copy the provided service file to `/etc/systemd/system/`:
+   ```bash
+   sudo cp /home/pi/rpi_headunit/scripts/car-shutdown.service /etc/systemd/system/car-shutdown.service
+   sudo systemctl daemon-reload
+   sudo systemctl enable car-shutdown.service
+   sudo systemctl start car-shutdown.service
+   ```
+
+> [!TIP]
+> **Kernel Overlay Alternative (Zero-Code Method):** If using a basic power HAT or step-down board that pulls a GPIO pin low, you can also enable safe kernel-level shutdown without Python by adding this line to `/boot/firmware/config.txt`:
+> ```ini
+> dtoverlay=gpio-shutdown,gpio_pin=26,active_low=1
+> ```
+
+---
+
+### Method 2: Read-Only Filesystem (OverlayFS - Bulletproof Software Method)
+
+If you use a simple 12V-to-5V step-down converter without a smart HAT, lock the SD card into **Read-Only** mode using built-in Linux OverlayFS.
+
+#### **Setup via `raspi-config`**:
+1. Run `sudo raspi-config` in terminal.
+2. Navigate to **4 Performance Options** ──► **P3 Overlay File System**.
+3. Select **YES** to enable the overlay filesystem (makes overlay read-only).
+4. Select **YES** to lock the boot partition as read-only.
+5. Reboot the Pi (`sudo reboot`).
+
+#### **How OverlayFS Works**:
+All OS log writes and temp files are written to a virtual RAM disk instead of physical flash storage. When power cuts abruptly when turning off the car key, RAM clears instantly with **zero risk of physical SD card corruption**.
+
+> [!NOTE]
+> **Read-Only Trade-off**: Changes made while OverlayFS is enabled (paired Bluetooth devices, new Wi-Fi networks, settings) will reset on reboot. To make permanent system configuration updates, disable OverlayFS via `sudo raspi-config`, make your edits, and re-enable OverlayFS.

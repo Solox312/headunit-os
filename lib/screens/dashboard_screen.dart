@@ -72,21 +72,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.wb_sunny_rounded, color: AutomotiveColors.orangeAccent, size: 36),
-                                const SizedBox(width: 12),
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: AutomotiveColors.glassPanel,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: AutomotiveColors.stroke, width: 1.0),
+                                  ),
+                                  child: const Icon(
+                                    Icons.wb_sunny_rounded,
+                                    color: AutomotiveColors.orangeAccent,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         "72°F Sunny",
-                                        style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                        style: GoogleFonts.spaceGrotesk(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: AutomotiveColors.textPrimary,
+                                        ),
                                       ),
                                       Text(
                                         "Low 64°F • High 78°F",
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.inter(fontSize: 12, color: AutomotiveColors.textSecondary),
+                                        style: GoogleFonts.jetBrainsMono(
+                                          fontSize: 11,
+                                          color: AutomotiveColors.textSecondary,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -96,24 +116,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             const Spacer(),
                             Text(
                               _timeString,
-                              style: GoogleFonts.orbitron(
+                              style: GoogleFonts.spaceGrotesk(
                                 fontSize: 38,
                                 fontWeight: FontWeight.bold,
                                 color: AutomotiveColors.textPrimary,
-                                letterSpacing: 1.5,
+                                letterSpacing: -0.5,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               _dateString,
                               style: GoogleFonts.inter(
-                                fontSize: 14,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w500,
-                                color: AutomotiveColors.cyanAccent,
+                                color: AutomotiveColors.electricCyan,
                               ),
                             ),
                             const Spacer(),
-                            const Divider(color: AutomotiveColors.cardBorder),
+                            const Divider(color: AutomotiveColors.strokeSoft),
                             const SizedBox(height: 12),
                             // Quick App Launchers
                             Row(
@@ -123,21 +143,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   context,
                                   label: "Navigation",
                                   icon: Icons.navigation_rounded,
-                                  color: Colors.greenAccent,
+                                  color: AutomotiveColors.electricCyan,
                                   onTap: widget.onOpenProjection,
                                 ),
                                 _buildQuickLauncher(
                                   context,
                                   label: "Music",
-                                  icon: Icons.music_note_rounded,
-                                  color: Colors.pinkAccent,
+                                  icon: Icons.headphones_rounded,
+                                  color: AutomotiveColors.dongleViolet,
                                   onTap: () {},
                                 ),
                                 _buildQuickLauncher(
                                   context,
                                   label: "Phone",
                                   icon: Icons.phone_rounded,
-                                  color: Colors.blueAccent,
+                                  color: AutomotiveColors.nativeGreen,
                                   onTap: widget.onOpenProjection,
                                 ),
                               ],
@@ -162,43 +182,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     flex: 5,
                     child: GlassCard(
                       onTap: widget.onOpenProjection,
+                      showCornerReticles: true,
                       borderColor: projection.state.mode == ProjectionMode.appleCarPlay
                           ? AutomotiveColors.carPlayColor
                           : (projection.state.mode == ProjectionMode.androidAuto
                               ? AutomotiveColors.androidAutoColor
-                              : AutomotiveColors.cyanAccent),
+                              : AutomotiveColors.electricCyan),
                       child: Stack(
                         children: [
                           Positioned.fill(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(
-                                  projection.state.mode == ProjectionMode.appleCarPlay
-                                      ? Icons.phone_iphone_rounded
-                                      : Icons.phone_android_rounded,
-                                  size: 48,
-                                  color: projection.state.mode == ProjectionMode.appleCarPlay
-                                      ? AutomotiveColors.carPlayColor
-                                      : AutomotiveColors.androidAutoColor,
+                                Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    color: AutomotiveColors.glassPanel,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: projection.state.mode == ProjectionMode.appleCarPlay
+                                          ? AutomotiveColors.carPlayColor
+                                          : (projection.state.mode == ProjectionMode.androidAuto
+                                              ? AutomotiveColors.androidAutoColor
+                                              : AutomotiveColors.electricCyan),
+                                      width: 1.0,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    projection.state.mode == ProjectionMode.appleCarPlay
+                                        ? Icons.phone_iphone_rounded
+                                        : Icons.phone_android_rounded,
+                                    size: 28,
+                                    color: projection.state.mode == ProjectionMode.appleCarPlay
+                                        ? AutomotiveColors.carPlayColor
+                                        : (projection.state.mode == ProjectionMode.androidAuto
+                                            ? AutomotiveColors.androidAutoColor
+                                            : AutomotiveColors.electricCyan),
+                                  ),
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 14),
                                 Text(
                                   projection.state.mode == ProjectionMode.appleCarPlay
                                       ? "Apple CarPlay Active"
                                       : (projection.state.mode == ProjectionMode.androidAuto
                                           ? "Android Auto Active"
                                           : "Projection Disconnected"),
-                                  style: GoogleFonts.orbitron(
+                                  style: GoogleFonts.spaceGrotesk(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: AutomotiveColors.textPrimary,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  "Connected to ${projection.state.deviceName} • Tap to view full screen",
-                                  style: GoogleFonts.inter(fontSize: 12, color: AutomotiveColors.textSecondary),
+                                  "Connected to ${projection.state.deviceName} • Tap for stream",
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: AutomotiveColors.textSecondary,
+                                  ),
                                 ),
                               ],
                             ),
@@ -209,21 +251,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(12),
+                                color: AutomotiveColors.panelDark,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AutomotiveColors.stroke, width: 1),
                               ),
                               child: Row(
                                 children: [
                                   Container(
                                     width: 8,
                                     height: 8,
-                                    decoration: BoxDecoration(
-                                      color: Colors.greenAccent,
+                                    decoration: const BoxDecoration(
+                                      color: AutomotiveColors.nativeGreen,
                                       shape: BoxShape.circle,
                                     ),
                                   ),
-                                  SizedBox(width: 6),
-                                  Text("LIVE STREAM", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    "LIVE STREAM",
+                                    style: GoogleFonts.jetBrainsMono(
+                                      color: AutomotiveColors.textPrimary,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -241,26 +291,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Row(
                         children: [
                           Container(
-                            width: 76,
-                            height: 76,
+                            width: 64,
+                            height: 64,
                             decoration: BoxDecoration(
-                              color: AutomotiveColors.surfaceGlass,
-                              borderRadius: BorderRadius.circular(12),
+                              color: AutomotiveColors.glassPanel,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AutomotiveColors.stroke, width: 1.0),
                             ),
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
                               child: Image.network(
                                 media.mediaItem.coverUrl,
-                                width: 76,
-                                height: 76,
+                                width: 64,
+                                height: 64,
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: AutomotiveColors.cardBackground,
-                                    child: const Icon(
+                                  return const Center(
+                                    child: Icon(
                                       Icons.album_rounded,
-                                      size: 40,
-                                      color: AutomotiveColors.purpleAccent,
+                                      size: 32,
+                                      color: AutomotiveColors.dongleViolet,
                                     ),
                                   );
                                 },
@@ -277,14 +327,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   media.mediaItem.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                                  style: GoogleFonts.spaceGrotesk(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: AutomotiveColors.textPrimary,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   media.mediaItem.artist,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.inter(fontSize: 13, color: AutomotiveColors.textSecondary),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: AutomotiveColors.textSecondary,
+                                  ),
                                 ),
                               ],
                             ),
@@ -293,7 +350,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             children: [
                               IconButton(
                                 icon: const Icon(Icons.skip_previous_rounded),
-                                iconSize: 30,
+                                iconSize: 28,
+                                color: AutomotiveColors.textPrimary,
                                 onPressed: () => media.previousTrack(),
                               ),
                               IconButton(
@@ -301,12 +359,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     ? Icons.pause_circle_filled_rounded
                                     : Icons.play_circle_fill_rounded),
                                 iconSize: 42,
-                                color: AutomotiveColors.cyanAccent,
+                                color: AutomotiveColors.electricCyan,
                                 onPressed: () => media.togglePlayPause(),
                               ),
                               IconButton(
                                 icon: const Icon(Icons.skip_next_rounded),
-                                iconSize: 30,
+                                iconSize: 28,
+                                color: AutomotiveColors.textPrimary,
                                 onPressed: () => media.nextTrack(),
                               ),
                             ],
@@ -333,22 +392,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: color.withValues(alpha: 0.5)),
+              color: AutomotiveColors.glassPanel,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: color, width: 1.0),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.15),
+                  blurRadius: 12,
+                ),
+              ],
             ),
             child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(height: 6),
           Text(
             label,
-            style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+            style: GoogleFonts.inter(
+              color: AutomotiveColors.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),

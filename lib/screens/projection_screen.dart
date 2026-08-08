@@ -24,11 +24,11 @@ class ProjectionScreen extends StatelessWidget {
               children: [
                 Text(
                   "PROJECTION STREAM",
-                  style: GoogleFonts.orbitron(
-                    fontSize: 16,
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: AutomotiveColors.textPrimary,
-                    letterSpacing: 1.2,
+                    letterSpacing: -0.3,
                   ),
                 ),
                 const Spacer(),
@@ -52,7 +52,7 @@ class ProjectionScreen extends StatelessWidget {
                   context,
                   label: "Simulator Mode",
                   mode: ProjectionMode.simulator,
-                  activeColor: AutomotiveColors.cyanAccent,
+                  activeColor: AutomotiveColors.electricCyan,
                   icon: Icons.computer_rounded,
                 ),
               ],
@@ -82,12 +82,16 @@ class ProjectionScreen extends StatelessWidget {
     final isSelected = projection.state.mode == mode;
 
     return ChoiceChip(
-      avatar: Icon(icon, size: 18, color: isSelected ? Colors.white : AutomotiveColors.textSecondary),
+      avatar: Icon(icon, size: 16, color: isSelected ? Colors.white : AutomotiveColors.textSecondary),
       label: Text(label),
       selected: isSelected,
       selectedColor: activeColor,
-      backgroundColor: AutomotiveColors.cardBackground,
-      labelStyle: TextStyle(
+      backgroundColor: AutomotiveColors.glassPanel,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: isSelected ? activeColor : AutomotiveColors.stroke),
+      ),
+      labelStyle: GoogleFonts.inter(
         color: isSelected ? Colors.white : AutomotiveColors.textSecondary,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         fontSize: 12,
@@ -103,9 +107,9 @@ class ProjectionScreen extends StatelessWidget {
   Widget _buildDisconnectedState(BuildContext context, ProjectionProvider projection) {
     return Container(
       decoration: BoxDecoration(
-        color: AutomotiveColors.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AutomotiveColors.cardBorder),
+        color: AutomotiveColors.glassPanel,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AutomotiveColors.stroke),
       ),
       child: Center(
         child: Column(
@@ -115,7 +119,7 @@ class ProjectionScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               "No Phone Connected",
-              style: GoogleFonts.orbitron(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+              style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
             ),
             const SizedBox(height: 8),
             Text(
@@ -126,9 +130,9 @@ class ProjectionScreen extends StatelessWidget {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text("Launch Projection Simulator"),
+              label: Text("Launch Projection Simulator", style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AutomotiveColors.cyanAccent,
+                backgroundColor: AutomotiveColors.electricCyan,
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

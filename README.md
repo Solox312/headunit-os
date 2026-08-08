@@ -12,7 +12,7 @@ An open-source, automotive-grade touchscreen **HeadUnit OS** built for **Raspber
   * **Carlinkit Hardware Dongle Support**: Hardware bridge support for dual Wireless CarPlay & Wireless Android Auto.
   * **Auto-Detect Mode**: Automatically uses hardware USB dongles when plugged in, otherwise falling back to native software wireless.
 * **📻 Multi-Target Audio Routing**: Instant UI switching between **AUX Cable / 3.5mm DAC**, **Car Bluetooth Stereo (A2DP)**, **FM Transmitter (88.3 MHz)**, and **HDMI Speakers**.
-* **⚡ 10-Second Kiosk Autostart**: Configured for auto-booting on car key turn via `systemd` in full-screen kiosk mode.
+* **⚡ Intelligent Ignition Power Management**: Auto-boots on car key turn via 3-wire Intelligent Power HAT (Constant 12V + Switched ACC) and executes graceful `sudo shutdown -h now` via GPIO upon key removal to protect SD card integrity.
 * **🖥️ Responsive Display Scaling**: Adaptive scaling for **10.1" 1280x800**, **10.1" 1024x600**, **10.1" 1280x720**, and **7"** displays.
 
 ---
@@ -21,6 +21,8 @@ An open-source, automotive-grade touchscreen **HeadUnit OS** built for **Raspber
 
 | Document | Description |
 | :--- | :--- |
+| **[⭐ Complete Setup Guide](docs/setup_guide.md)** | **Start here.** All-in-one instructions per IEC/IEEE 82079-1 — safety, parts, assembly, 12V wiring, OS install, kiosk, projection, troubleshooting, maintenance, disposal, and technical data. |
+| **[Brand Identity & Design Guide](docs/brand_identity_guide.md)** | Complete visual identity, brand essence, color tokens, Space Grotesk typography, and UI specs. |
 | **[Hardware Shopping List](docs/hardware_shopping_list.md)** | Complete parts breakdown, prices, cables, and 12V power accessories. |
 | **[Hardware Assembly Guide](docs/hardware_assembly_guide.md)** | Step-by-step physical build, bench testing, 12V wiring, and dash mounting. |
 | **[Raspberry Pi Setup Guide](docs/rpi_setup_guide.md)** | Raspberry Pi OS 64-bit setup, Flutter ARM64 build, display resolution, and systemd kiosk autostart. |
