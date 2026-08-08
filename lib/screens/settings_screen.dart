@@ -709,66 +709,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  GlassCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Connectivity & Receiver Engine",
-                          style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
-                        ),
-                        const SizedBox(height: 8),
-                        Consumer<ProjectionProvider>(
-                          builder: (context, projection, child) {
-                            return RadioGroup<ProjectionEngineType>(
-                              groupValue: projection.state.engineType,
-                              onChanged: (val) {
-                                if (val != null) projection.setEngineType(val);
-                              },
-                              child: Column(
-                                children: [
-                                  RadioListTile<ProjectionEngineType>(
-                                    title: Text("Auto-Detect Engine (Recommended)", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-                                    subtitle: Text("Uses USB Hardware Dongle if plugged in, otherwise falls back to Native Software Wireless", style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11)),
-                                    value: ProjectionEngineType.autoDetect,
-                                    activeColor: AutomotiveColors.electricCyan,
-                                  ),
-                                  RadioListTile<ProjectionEngineType>(
-                                    title: Text("100% Native Software Engine (No Dongle - \$0)", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-                                    subtitle: Text("Native RPi Bluetooth RFCOMM + 5GHz Wi-Fi Access Point engine", style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11)),
-                                    value: ProjectionEngineType.nativeSoftware,
-                                    activeColor: AutomotiveColors.nativeGreen,
-                                  ),
-                                  RadioListTile<ProjectionEngineType>(
-                                    title: Text("Carlinkit USB Hardware Dongle", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-                                    subtitle: Text("Dedicated dual-chip hardware bridge (CarPlay & Android Auto)", style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11)),
-                                    value: ProjectionEngineType.carlinkitHardware,
-                                    activeColor: AutomotiveColors.dongleViolet,
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                        const Divider(color: AutomotiveColors.strokeSoft),
-                        SwitchListTile(
-                          title: Text("Wireless CarPlay & Android Auto Hotspot", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14)),
-                          subtitle: Text("RPi 5GHz Wi-Fi Access Point enabled", style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11)),
-                          value: _wirelessHotspot,
-                          activeThumbColor: AutomotiveColors.electricCyan,
-                          onChanged: (val) => setState(() => _wirelessHotspot = val),
-                        ),
-                        SwitchListTile(
-                          title: Text("Auto-Connect Last Paired Device", style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 14)),
-                          subtitle: Text("Automatically connect wirelessly via Bluetooth & Wi-Fi on car start", style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11)),
-                          value: _autoConnect,
-                          activeThumbColor: AutomotiveColors.electricCyan,
-                          onChanged: (val) => setState(() => _autoConnect = val),
-                        ),
-                      ],
-                    ),
-                  ),
+
                   const SizedBox(height: 12),
                   // Dedicated Audio Output & Sound Routing Card
                   GlassCard(
