@@ -64,7 +64,7 @@ sudo apt-get install -y --no-install-recommends \
   network-manager \
   librtaudio-dev \
   qtbase5-dev qtmultimedia5-dev \
-  libqt5bluetooth5-dev \
+  qtconnectivity5-dev \
   libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
 success "Build dependencies installed."
 
