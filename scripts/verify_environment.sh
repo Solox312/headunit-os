@@ -42,7 +42,7 @@ check_cmd() {
 
 check_pkg() {
   local pkg=$1
-  if dpkg -l | grep -q "^ii  $pkg "; then
+  if dpkg -s "$pkg" 2>/dev/null | grep -q "Status: install ok installed"; then
     echo -e "  [${GREEN}OK${NC}] $pkg"
   else
     echo -e "  [${RED}MISSING${NC}] $pkg"
