@@ -128,12 +128,11 @@ success "aasdk installed to $INSTALL_PREFIX."
 # ── 3. Build openauto ─────────────────────────────────────────────────────────
 info "Step 3/6 — Building openauto..."
 cd "$BUILD_DIR"
-if [[ ! -d "openauto" ]]; then
-  git clone --depth=1 https://github.com/f1xpl/openauto.git
-  
-  info "Patching openauto for Boost 1.70+ compatibility..."
-  find openauto -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
-fi
+rm -rf openauto
+git clone --depth=1 https://github.com/f1xpl/openauto.git
+
+info "Patching openauto for Boost 1.70+ compatibility..."
+find openauto -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
 cd openauto
 mkdir -p build && cd build
 cmake .. \
