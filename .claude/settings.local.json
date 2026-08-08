@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(flutter analyze *)",
-      "Bash(flutter test *)"
+      "Bash(flutter test *)",
+      "Bash(bash -n scripts/install_openauto.sh)"
     ]
   }
 }

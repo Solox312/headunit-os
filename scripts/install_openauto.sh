@@ -71,14 +71,24 @@ success "Build dependencies installed."
 # ── 2. Build aasdk ────────────────────────────────────────────────────────────
 info "Step 2/6 — Building aasdk (Android Auto SDK)..."
 cd "$BUILD_DIR"
-if [[ ! -d "aasdk" ]]; then
-  git clone --depth=1 https://github.com/f1xpl/aasdk.git
-  
-  info "Patching aasdk for Boost 1.70+ and OpenSSL 3.0 compatibility..."
-  find aasdk -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
-  sed -i '1s/^/#include <boost\/core\/noncopyable.hpp>\n/' aasdk/include/f1x/aasdk/IO/Promise.hpp
-  sed -i 's/FIPS_mode_set(0);//g' aasdk/src/Transport/SSLWrapper.cpp
-fi
+# Always re-clone fresh rather than reusing a directory left behind by a
+# previous run: an existing checkout from before a patch was added here
+# would silently skip re-cloning *and* re-patching, and "make" would just
+# resume building the stale, unpatched tree (this is exactly what caused
+# the LIBUSB_HOTPLUG_NO_FLAGS build failure below to persist across runs).
+rm -rf aasdk
+git clone --depth=1 https://github.com/f1xpl/aasdk.git
+
+info "Patching aasdk for Boost 1.70+, OpenSSL 3.0, and libusb 1.0.27+ compatibility..."
+find aasdk -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
+sed -i '1s/^/#include <boost\/core\/noncopyable.hpp>\n/' aasdk/include/f1x/aasdk/IO/Promise.hpp
+sed -i 's/FIPS_mode_set(0);//g' aasdk/src/Transport/SSLWrapper.cpp
+# libusb 1.0.27 made libusb_hotplug_flag a real enum; aasdk passes the bare
+# LIBUSB_HOTPLUG_NO_FLAGS macro (an int) into that parameter with no cast,
+# which newer GCC rejects outright. Cast it explicitly rather than relying
+# on -fpermissive alone.
+sed -i 's/LIBUSB_HOTPLUG_NO_FLAGS/static_cast<libusb_hotplug_flag>(LIBUSB_HOTPLUG_NO_FLAGS)/g' \
+  aasdk/src/USB/USBHub.cpp
 cd aasdk
 mkdir -p build && cd build
 cmake .. \
@@ -93,12 +103,11 @@ success "aasdk installed to $INSTALL_PREFIX."
 # ── 3. Build openauto ─────────────────────────────────────────────────────────
 info "Step 3/6 — Building openauto..."
 cd "$BUILD_DIR"
-if [[ ! -d "openauto" ]]; then
-  git clone --depth=1 https://github.com/f1xpl/openauto.git
-  
-  info "Patching openauto for Boost 1.70+ compatibility..."
-  find openauto -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
-fi
+rm -rf openauto
+git clone --depth=1 https://github.com/f1xpl/openauto.git
+
+info "Patching openauto for Boost 1.70+ compatibility..."
+find openauto -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
 cd openauto
 mkdir -p build && cd build
 cmake .. \
