@@ -62,8 +62,22 @@ echo -e "${CYAN}[3/5] Building HeadUnit OS release bundle...${NC}"
 cd "$PROJECT_DIR"
 if command -v flutter &> /dev/null; then
   flutter pub get
+  flutter build linux --release || true
   flutter build bundle --target-platform=linux-x64
-  echo -e "${GREEN}✓ Flutter assets bundle built successfully.${NC}"
+  
+  # Copy icudtl.dat from Flutter engine cache or release bundle into flutter_assets
+  ICU_FILE=$(find "$PROJECT_DIR/build" -name "icudtl.dat" 2>/dev/null | head -n 1)
+  if [ -n "$ICU_FILE" ]; then
+    cp "$ICU_FILE" "$PROJECT_DIR/build/flutter_assets/" 2>/dev/null || true
+  else
+    FLUTTER_BIN=$(which flutter)
+    FLUTTER_DIR=$(dirname $(dirname "$FLUTTER_BIN"))
+    ICU_ENGINE=$(find "$FLUTTER_DIR" -name "icudtl.dat" 2>/dev/null | head -n 1)
+    if [ -n "$ICU_ENGINE" ]; then
+      cp "$ICU_ENGINE" "$PROJECT_DIR/build/flutter_assets/" 2>/dev/null || true
+    fi
+  fi
+  echo -e "${GREEN}✓ Flutter assets bundle & icudtl.dat prepared successfully.${NC}"
 else
   echo -e "${YELLOW}⚠️  Flutter SDK not found in PATH. Skipping build step (assuming pre-built bundle).${NC}"
 fi
@@ -78,9 +92,9 @@ echo ""
 # ── 5. Install & Start Systemd Kiosk Service ─────────────────────────────────
 echo -e "${CYAN}[5/5] Installing /etc/systemd/system/headunit.service...${NC}"
 
-ASSETS_PATH="$PROJECT_DIR/build/flutter_assets"
+ASSETS_PATH="$PROJECT_DIR/build/linux/x64/release/bundle"
 if [ ! -d "$ASSETS_PATH" ]; then
-  ASSETS_PATH="$PROJECT_DIR/build/elm"
+  ASSETS_PATH="$PROJECT_DIR/build/flutter_assets"
 fi
 
 sudo tee /etc/systemd/system/headunit.service > /dev/null << EOF
