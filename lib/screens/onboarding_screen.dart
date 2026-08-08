@@ -200,20 +200,39 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
 
-            // Page View Carousel
+            // Page View Carousel — padded up when the virtual keyboard is open
             Expanded(
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentPage = index;
-                  });
+              child: Consumer<KeyboardProvider>(
+                builder: (context, kb, _) {
+                  // Approximate height of the virtual keyboard (4 rows of keys + header + padding).
+                  // Clamped to the same range used by VirtualKeyboard itself.
+                  final screenHeight = MediaQuery.of(context).size.height;
+                  final keyHeight = (screenHeight * 0.075).clamp(34.0, 56.0);
+                  final verticalPadding = (screenHeight * 0.012).clamp(4.0, 12.0);
+                  // 4 rows + 3 spacers (5px each) + header row (~36px) + top/bottom padding
+                  final keyboardHeight = kb.isVisible
+                      ? (keyHeight * 4) + (5 * 3) + 36 + (verticalPadding * 2.5)
+                      : 0.0;
+
+                  return AnimatedPadding(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                    padding: EdgeInsets.only(bottom: keyboardHeight),
+                    child: PageView(
+                      controller: _pageController,
+                      onPageChanged: (index) {
+                        setState(() {
+                          _currentPage = index;
+                        });
+                      },
+                      children: [
+                        _buildProfilePage(),
+                        _buildWifiUpdatesPage(),
+                        _buildAudioPage(),
+                      ],
+                    ),
+                  );
                 },
-                children: [
-                  _buildProfilePage(),
-                  _buildWifiUpdatesPage(),
-                  _buildAudioPage(),
-                ],
               ),
             ),
 
