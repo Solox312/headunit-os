@@ -24,6 +24,8 @@ An open-source, automotive-grade touchscreen **HeadUnit OS** built for **Raspber
 | Document | Description |
 | :--- | :--- |
 | **[⭐ Complete Setup Guide](docs/setup_guide.md)** | **Start here.** All-in-one instructions per IEC/IEEE 82079-1 — safety, parts, assembly, 12V wiring, OS install, kiosk, projection, troubleshooting, maintenance, disposal, and technical data. |
+| **[Ubuntu Server Setup Guide](docs/ubuntu_server_setup.md)** | Headless DRM/KMS kiosk installation and commissioning manual for Ubuntu Server 22.04 / 24.04 (IEC/IEEE 82079-1). |
+| **[Linux Developer Setup Guide](docs/linux_dev_setup.md)** | Linux Mint & Ubuntu desktop developer workstation setup, Intel Bluetooth firmware fixes, and build troubleshooting (IEC/IEEE 82079-1). |
 | **[Brand Identity & Design Guide](docs/brand_identity_guide.md)** | Complete visual identity, brand essence, color tokens, Space Grotesk typography, and UI specs. |
 | **[Hardware Shopping List](docs/hardware_shopping_list.md)** | Complete parts breakdown, prices, cables, and 12V power accessories. |
 | **[Hardware Assembly Guide](docs/hardware_assembly_guide.md)** | Step-by-step physical build, bench testing, 12V wiring, and dash mounting. |

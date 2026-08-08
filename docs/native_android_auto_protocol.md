@@ -1,86 +1,103 @@
-# Native Wireless Android Auto Protocol Receiver Architecture (No Dongle Required)
+# HeadUnit OS — Native Android Auto Protocol Receiver Specification
 
-This guide documents how to build a **100% native WIRELESS Android Auto receiver software stack** directly on Linux / Raspberry Pi using the Pi's built-in Bluetooth and 5GHz Wi-Fi — completely eliminating hardware dongles.
+**Information for Use (Technical Specification & Architecture) — Structured in accordance with IEC/IEEE 82079-1:2019 Standard**
 
 ---
 
-## 🏗️ Architectural Overview
+## Document Identification
+
+| Item | Specification |
+| :--- | :--- |
+| **Document Title** | Native Android Auto Protocol Engine Specification & Architecture |
+| **Document Type** | Technical Specification & Protocol Architecture Guide |
+| **Document Identifier** | HUOS-SPEC-003-REV-B |
+| **Revision** | B (Native Protocol Stack Edition) |
+| **Issue Date** | 2026-08-08 |
+| **Applies to Product** | HeadUnit OS Android Auto Receiver Subsystem |
+| **Target OS** | Linux (Ubuntu Server / Linux Mint / Raspberry Pi OS) |
+| **Target Audience** | Embedded Systems Engineers, Protocol Developers |
+| **Language** | English (en-US) |
+
+---
+
+## Safety & Operational Precautions
+
+> [!IMPORTANT]
+> **Wireless Interference & 5GHz Wi-Fi Band Selection:**
+> Use Wi-Fi 5GHz Band (UNII-1 Channels 36–48) for high-bandwidth H.264 video streaming. 2.4GHz Wi-Fi is subject to severe interference from Bluetooth RFCOMM handshakes.
+
+---
+
+## 1. System Architecture Overview
+
+HeadUnit OS implements a **100% native Android Auto protocol receiver stack** directly in Dart and Linux system libraries—completely eliminating external C++ binary dependencies (`autoapp`, Boost 1.67, Qt5).
 
 ```
  ┌─────────────────────────────────────────────────────────────────────────────┐
  │                      FLUTTER HEAD UNIT DISPLAY LAYER                        │
  │  ┌───────────────────────────────────────────────────────────────────────┐  │
- │  │ Flutter Texture Widget (Video Frame) & Gesture Listener (Touch Input) │  │
+ │  │ Flutter AndroidAutoView Widget (H.264 Frame) & Gesture Listener        │  │
  │  └───────────────────────────────────▲───────────────────────────────────┘  │
  └──────────────────────────────────────┼──────────────────────────────────────┘
-                                        │ FFI / TCP Sockets (192.168.43.1:50001)
+                                        │ Packets / Stream (Port 50001)
  ┌──────────────────────────────────────┴──────────────────────────────────────┐
- │                  NATIVE WIRELESS ANDROID AUTO RECEIVER DAEMON               │
+ │                NATIVE ANDROID AUTO PROTOCOL ENGINE (DART/C)                 │
  │                                                                             │
  │  ┌───────────────────────────┐           ┌──────────────────────────────┐  │
  │  │ 1. Bluetooth RFCOMM       │           │ 2. 5GHz Wi-Fi Direct / AP    │  │
- │  │    UUID: 0000fdf0-...     │           │    `hostapd` + `dnsmasq`     │  │
+ │  │    UUID: 0000fdf0-...     │           │    `nmcli` / `hostapd`       │  │
  │  └─────────────┬─────────────┘           └──────────────┬───────────────┘  │
  │                │                                        │                  │
  │  ┌─────────────▼────────────────────────────────────────▼───────────────┐  │
  │  │ 3. Protocol Buffer (Protobuf) Channel Multiplexer (Port 50001)       │  │
- │  │    ├─ Channel 0: System Control & Heartbeat                          │  │
- │  │    ├─ Channel 1: Wireless Video Stream (H.264 / AV1 via FFmpeg/V4L2)  │  │
- │  │    ├─ Channel 2: Wireless Media Audio (PCM 48kHz to PulseAudio)       │  │
- │  │    ├─ Channel 3: Wireless Speech Audio (Microphone Input)            │  │
- │  │    ├─ Channel 4: Input Channel (Multi-touch & Hardware Keys)         │  │
- │  │    └─ Channel 5: Sensor Channel (Driving status & Night mode)        │  │
+ │  │    ├─ Channel 0: Control Service & Handshake                         │  │
+ │  │    ├─ Channel 1: Wireless Media Audio (PCM 48kHz to PulseAudio)       │  │
+ │  │    ├─ Channel 2: Speech Audio (Voice Guidance & Mic)                 │  │
+ │  │    ├─ Channel 3: System Audio (Notifications)                        │  │
+ │  │    ├─ Channel 4: Touch Input Channel (Multi-touch & Hardware Keys)   │  │
+ │  │    ├─ Channel 5: H.264 Video Stream                                  │  │
+ │  │    └─ Channel 6: Vehicle Sensor Channel (Driving status & Night mode)│  │
  │  └──────────────────────────────────────────────────────────────────────┘  │
  └──────────────────────────────────────▲──────────────────────────────────────┘
-                                        │ 5GHz Wi-Fi Direct Stream
+                                        │ 5GHz Wi-Fi / USB AOA Connection
  ┌──────────────────────────────────────┴──────────────────────────────────────┐
- │                      YOUR ANDROID PHONE (In Pocket/Purse)                   │
+ │                            ANDROID SMARTPHONE                               │
  └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🛠️ Step-by-Step Wireless Protocol Implementation
+## 2. Protocol Channel Specification
 
-### Step 1: Bluetooth RFCOMM Handshake (`BlueZ`)
-1. When you get into your car and start the RPi, the Raspberry Pi's onboard Bluetooth daemon (`BlueZ`) advertises the Android Auto Bluetooth UUID:
-   `0000fdf0-0000-1000-8000-00805f9b34fb`
-2. Your Android phone automatically connects to the RPi over Bluetooth.
-3. The RPi sends a JSON payload over Bluetooth RFCOMM containing the RPi's **5GHz Wi-Fi Access Point credentials**:
-   ```json
-   {
-     "ssid": "RPi_HeadUnit_5G",
-     "bssid": "B8:27:EB:AA:BB:CC",
-     "passphrase": "AutomotiveWiFiSecretKey",
-     "port": 50001,
-     "ip": "192.168.43.1"
-   }
-   ```
-
-### Step 2: High-Speed 5GHz Wi-Fi Handoff (`hostapd`)
-1. Upon receiving the Wi-Fi credentials over Bluetooth, your phone turns on Wi-Fi and connects to `RPi_HeadUnit_5G` (5GHz WPA2 Access Point).
-2. The phone initiates a TCP socket connection to `192.168.43.1:50001`.
-
-### Step 3: SSL Encrypted Wireless Stream
-Once connected over 5GHz Wi-Fi, the receiver opens 6 dedicated Protocol Buffer (`protobuf`) channels:
-* **Channel 1**: Streams H.264 video wirelessly at 60fps directly into Flutter's `Texture` widget.
-* **Channel 2**: Streams PCM 48kHz audio wirelessly to RPi speakers.
-* **Channel 4**: Relays touch inputs from the screen back over the air to your phone.
+| Channel ID | Name | Protocol Data Unit (PDU) Description |
+| :--- | :--- | :--- |
+| **Channel 0** | Control Service | `VersionRequest`, `VersionResponse`, `ServiceDiscoveryRequest`, `ServiceDiscoveryResponse`, `Ping` |
+| **Channel 1** | Media Audio | PCM 48kHz Stereo Audio Stream (Music/Navigation Audio) |
+| **Channel 2** | Speech Audio | PCM 16kHz Mono Voice Guidance & Microphone Input |
+| **Channel 3** | System Audio | PCM System Beeps & Notification Sounds |
+| **Channel 4** | Input Service | Normalized Touch Coordinates `(x, y)` & Touch Actions (Press=0, Move=1, Release=2) |
+| **Channel 5** | Video Service | H.264 NAL Video Stream (720p / 1080p @ 30/60 FPS) |
+| **Channel 6** | Sensor Service | Night Mode Status, Driving Status, Vehicle GPS Coordinates |
 
 ---
 
-## 📦 Setting Up 5GHz Wi-Fi AP on Raspberry Pi (`hostapd`)
+## 3. Protocol Sequence & Commissioning
 
-On your Raspberry Pi, install `hostapd` and `dnsmasq` to host the 5GHz Wireless Android Auto hotspot:
+### Phase 1: USB AOAP / Bluetooth Discovery
+1. **USB Mode:** Scans for USB vendor devices and sends AOA 2.0 control requests (`GET_PROTOCOL`, `SEND_STRING`, `START_ACCESSORY`), switching device Vendor ID to `0x18d1:0x2d00`.
+2. **Wireless Mode:** Bluetooth RFCOMM advertises UUID `0000fdf0-0000-1000-8000-00805f9b34fb` and exchanges 5GHz Wi-Fi credentials (`SSID`, `BSSID`, `passphrase`, `port`).
 
-```bash
-# 1. Install Access Point packages
-sudo apt update
-sudo apt install -y hostapd dnsmasq bluez
+### Phase 2: Channel Multiplexing & Video Rendering
+1. The smartphone establishes a TCP socket connection on Port 50001.
+2. `AAPacket` binary codec demuxes incoming streams by Channel ID.
+3. Channel 5 (H.264 Video) renders directly on `AndroidAutoView`.
+4. Touch gestures captured on `AndroidAutoView` are serialized and transmitted on Channel 4.
 
-# 2. Configure 5GHz Access Point (/etc/hostapd/hostapd.conf)
-# ssid=RPi_HeadUnit_5G
-# hw_mode=a
-# channel=36  (5GHz Band)
-# wpa=2
-```
+---
+
+## Document Revision History
+
+| Revision | Date | Description of Change | Approved By |
+| :--- | :--- | :--- | :--- |
+| A | 2026-08-08 | Initial Native Protocol Architecture Specification | HeadUnit OS Team |
+| B | 2026-08-08 | Updated to IEC/IEEE 82079-1 standard with full channel spec | HeadUnit OS Team |

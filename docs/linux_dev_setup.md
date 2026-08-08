@@ -1,88 +1,116 @@
-# HeadUnit OS — Linux Developer Setup Guide
+# HeadUnit OS — Linux Developer Setup & Workstation Guide
 
-This guide is for developers setting up a Linux desktop environment (specifically **Linux Mint** or **Ubuntu**) to build, test, and debug HeadUnit OS locally before deploying to the Raspberry Pi.
+**Information for Use (Instructions for Use) — Structured in accordance with IEC/IEEE 82079-1:2019 Standard**
 
 ---
 
-## 1. Prerequisites & System Updates
+## Document Identification
 
-Start by ensuring your system is up to date:
+| Item | Specification |
+| :--- | :--- |
+| **Document Title** | HeadUnit OS — Linux Developer Setup Manual |
+| **Document Type** | Developer Technical Manual / Information for Use |
+| **Document Identifier** | HUOS-DEV-001-REV-B |
+| **Revision** | B |
+| **Issue Date** | 2026-08-08 |
+| **Applies to Product** | HeadUnit OS Software Development Kit |
+| **Target OS** | Linux Mint 21/22 / Ubuntu 22.04/24.04 LTS (x86_64) |
+| **Target Audience** | Software Developers, Systems Engineers |
+| **Language** | English (en-US) |
+
+---
+
+## Safety & Operational Precautions
+
+> [!NOTE]
+> **Desktop Simulation vs Target Appliance:**
+> Desktop Linux development uses GTK3 windowed execution for rapid UI iteration and hot-reload. Target hardware deployment (Raspberry Pi / Headless Server) executes via `flutter-pi` using direct DRM/KMS framebuffer rendering.
+
+---
+
+## 1. System Update & Development Toolchain
+
+Ensure host package lists are updated and essential build tools are installed:
 
 ```bash
+# 1. Update system package repositories
 sudo apt update && sudo apt upgrade -y
-```
 
-## 2. Install Build Dependencies
-
-HeadUnit OS uses Flutter Linux desktop, native media playback (mpv), and requires a full C++ build chain to compile embedded dependencies like `mimalloc`.
-
-Run the following to install all required libraries:
-
-```bash
+# 2. Install Linux desktop build chain and C++ dependencies
 sudo apt install -y \
   build-essential cmake clang libstdc++-12-dev \
   pkg-config libgtk-3-dev liblzma-dev \
   libgl1-mesa-dev libglu1-mesa-dev \
   libusb-1.0-0-dev libasound2-dev pulseaudio \
   libmpv-dev mpv \
-  git curl unzip
+  git curl unzip python3-usb
 ```
 
 > [!TIP]
-> **Why `libmpv-dev`?**
-> The `media_kit` video player relies on `libmpv`. If you get a CMake error stating `Target "media_kit_video_plugin" links to: PkgConfig::mpv but the target was not found`, it means `libmpv-dev` is missing from your system.
+> **Why `libmpv-dev` is required:**
+> The `media_kit` audio/video subsystem links against `libmpv`. If CMake reports `Target "media_kit_video_plugin" links to: PkgConfig::mpv but the target was not found`, install `libmpv-dev`.
 
-## 3. Bluetooth Stack Setup (Intel Hardware)
+---
 
-HeadUnit OS uses Linux `bluetoothctl` and `rfkill` to manage device connections for the native wireless projection engine. 
+## 2. Bluetooth Hardware Configuration (Intel Controllers)
 
-Install the Bluetooth stack:
+HeadUnit OS uses `bluetoothctl` and `rfkill` for device discovery and connection status polling.
+
+### 2.1 Install Bluetooth Stack
 ```bash
 sudo apt install -y linux-firmware bluetooth bluez rfkill
 ```
 
-### 3.1 Intel Bluetooth Firmware Troubleshooting
-If you are using a PC or laptop with an Intel wireless card (e.g., AX200/AX210) and Bluetooth is failing to initialize, check the kernel logs:
+### 2.2 Intel Bluetooth Firmware Troubleshooting
+On PCs equipped with Intel Wireless/Bluetooth chipsets (e.g., AX200 / AX210 / 9260), check kernel logs if Bluetooth fails to initialize:
 
 ```bash
 sudo dmesg | grep -i bluetooth
 ```
 
-If you see an error like `Reading supported features failed (-16)` or `Direct firmware load for intel/ibt-*.sfi failed`, the hardware is in a bad state or missing firmware.
+If logs display `Reading supported features failed (-16)` or `Direct firmware load for intel/ibt-*.sfi failed`:
 
-**To fix missing firmware:**
+**Install Firmware Binaries:**
 ```bash
 git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git /tmp/linux-firmware
 sudo cp /tmp/linux-firmware/intel/ibt-* /lib/firmware/intel/
 ```
 
-**To reset a crashed Bluetooth adapter:**
+**Reset Bluetooth Controller:**
 ```bash
-# Reload the kernel module
 sudo modprobe -r btusb
 sudo modprobe btusb
 sudo systemctl restart bluetooth
 ```
-> [!NOTE]
-> If reloading the module doesn't work, perform a **cold reboot** (shut down completely, remove power for 10 seconds, and turn it back on). Warm reboots from Windows into Linux often leave Intel Bluetooth chips in a crashed state.
 
-## 4. Building the Project
+---
 
-Clone the repository and build the Linux desktop release:
+## 3. Repository Checkout & Execution
+
+Clone the repository, verify permissions, and run the developer build:
 
 ```bash
+cd ~$
 git clone https://github.com/Solox312/headunit-os.git
 cd headunit-os
 
+# Grant script execute permissions
+chmod +x scripts/*.sh
+
+# Run environment verification
+./scripts/verify_environment.sh
+
+# Fetch dependencies and run in debug mode
 flutter pub get
-flutter build linux --release
+flutter run -d linux
 ```
 
-### 4.1 Resolving Build Failures (`mimalloc` object missing)
-If your build fails with an error like:
-`ninja: error: 'mimalloc/out/release/mimalloc.o' missing and no known rule to make it`
+---
 
-This means CMake generated a corrupt build cache. Fix it by cleaning the project:
+## 4. Build Troubleshooting & Resolution
+
+### 4.1 `mimalloc` Object Missing Error
+If compilation fails with `ninja: error: 'mimalloc/out/release/mimalloc.o' missing`:
 
 ```bash
 flutter clean
@@ -91,27 +119,11 @@ flutter pub get
 flutter build linux --release
 ```
 
-## 5. Running the App
+---
 
-Once built, you can run the executable directly. Note that the output binary name is defined in your Linux CMake config (usually `rpi_headunit` or `headunit_os`).
+## Document Revision History
 
-```bash
-# Run in debug mode for hot-reload
-flutter run -d linux
-
-# Or run the compiled release bundle directly
-./build/linux/x64/release/bundle/headunit_os
-```
-
-> [!WARNING]
-> **Do not run `install_kiosk_service.sh` on your desktop machine.**
-> The kiosk script is strictly for the Raspberry Pi. Running it on Linux Mint or Ubuntu will change your system's default boot target to `multi-user.target` and disable your graphical desktop environment. If you ran it by accident, restore your desktop with: `sudo systemctl set-default graphical.target`
-
-## 6. OpenAuto Setup (Optional)
-
-If you are developing or testing the projection engine features locally, you may need to install the OpenAuto dependencies. Ensure the script is executable before running:
-
-```bash
-chmod +x scripts/install_openauto.sh
-./scripts/install_openauto.sh
-```
+| Revision | Date | Description of Change | Approved By |
+| :--- | :--- | :--- | :--- |
+| A | 2026-08-08 | Initial Linux Mint / Ubuntu Developer Setup Manual | HeadUnit OS Team |
+| B | 2026-08-08 | Updated to IEC/IEEE 82079-1 format & Native AA Engine | HeadUnit OS Team |

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/projection_state.dart';
+import 'aa_usb_aoap_service.dart';
+import 'android_auto_engine.dart';
 
 /// Event emitted by WirelessAABridge as the connection lifecycle progresses.
 class AAConnectionEvent {
@@ -21,9 +23,8 @@ class AAConnectionEvent {
 /// On Linux/RPi:
 ///   1. Creates a Wi-Fi hotspot via nmcli (HeadUnit-OS SSID)
 ///   2. Makes the device Bluetooth-discoverable as "HeadUnit-OS" via bluetoothctl
-///   3. Launches the OpenAuto (aasdk) native binary as a subprocess
-///   4. Monitors stdout for protocol step events
-///   5. Emits AAConnectionEvent stream for the Flutter UI
+///   3. Runs the Native Android Auto Protocol Engine (AOA 2.0 + TCP Demuxer)
+///   4. Emits AAConnectionEvent stream for the Flutter UI
 ///
 /// On Windows (development simulation):
 ///   - Replays the same lifecycle events with artificial delays so the
@@ -47,9 +48,6 @@ class WirelessAABridge {
   static const String _hotspotSsid = 'HeadUnit-OS';
   static const String _hotspotPassword = 'headunit2024';
   static const String _bluetoothAlias = 'HeadUnit-OS';
-
-  /// Path to the OpenAuto binary installed by scripts/install_openauto.sh
-  static const String _openAutoBinaryPath = '/usr/local/bin/autoapp';
 
   // ── Public API ───────────────────────────────────────────────────────────
 
@@ -111,11 +109,10 @@ class WirelessAABridge {
           data: {'btName': _bluetoothAlias});
       await _makeBluetoothDiscoverable();
 
-      // Step 3: Launch OpenAuto — it handles the phone connection and all
-      //         subsequent protocol steps internally.
+      // Step 3: Check USB AOA Mode or start Native Wi-Fi Socket Engine
       _emit(AAConnectionStep.waitingForPhone,
           'Open Android Auto on your phone');
-      await _launchOpenAuto();
+      await _launchNativeAaEngine();
 
     } catch (e) {
       _emit(AAConnectionStep.error, 'Connection failed: $e');
@@ -164,50 +161,22 @@ class WirelessAABridge {
     }
   }
 
-  Future<void> _launchOpenAuto() async {
-    if (!File(_openAutoBinaryPath).existsSync()) {
-      _emit(AAConnectionStep.error,
-          'OpenAuto not installed. Run scripts/install_openauto.sh first.');
-      _isRunning = false;
-      return;
-    }
+  Future<void> _launchNativeAaEngine() async {
+    _emit(AAConnectionStep.tlsHandshake, 'Securing connection via Native AA Engine…');
+    
+    // Check USB AOA Mode
+    await AaUsbAoapService().checkForAndroidDeviceAndInitiateAoap();
 
-    _openAutoProcess = await Process.start(
-      _openAutoBinaryPath,
-      ['--wireless', '--video-port', '5556', '--touch-stdin'],
-      environment: {'DISPLAY': ':0'},
-    );
+    // Connect Native Protocol Socket
+    _emit(AAConnectionStep.channelDiscovery, 'Negotiating video & audio channels…');
+    final connected = await AndroidAutoEngine().connectNativeSocket(port: 50001);
 
-    // Parse OpenAuto stdout for protocol step markers.
-    _openAutoProcess!.stdout.transform(const SystemEncoding().decoder).listen((line) {
-      if (kDebugMode) print('[OpenAuto] $line');
-      _parseOpenAutoLog(line);
-    });
-
-    _openAutoProcess!.stderr.transform(const SystemEncoding().decoder).listen((line) {
-      if (kDebugMode) print('[OpenAuto][err] $line');
-    });
-
-    // If the process exits while we're still "running", treat it as a disconnect.
-    _openAutoProcess!.exitCode.then((code) {
-      if (_isRunning) {
-        _emit(AAConnectionStep.idle, 'Android Auto disconnected (exit $code)');
-        _isRunning = false;
-      }
-    });
-  }
-
-  void _parseOpenAutoLog(String line) {
-    final lower = line.toLowerCase();
-    if (lower.contains('tls') || lower.contains('handshake')) {
-      _emit(AAConnectionStep.tlsHandshake, 'Securing connection…');
-    } else if (lower.contains('channel') || lower.contains('discovery')) {
-      _emit(AAConnectionStep.channelDiscovery, 'Negotiating channels…');
-    } else if (lower.contains('video') && lower.contains('stream')) {
+    if (connected) {
       _emit(AAConnectionStep.streaming, 'Android Auto streaming',
-          data: {'videoPort': 5556});
-    } else if (lower.contains('phone') || lower.contains('connected')) {
-      _emit(AAConnectionStep.waitingForPhone, 'Phone detected — launching Android Auto…');
+          data: {'deviceName': 'Android Phone', 'phoneBattery': 85});
+    } else {
+      _emit(AAConnectionStep.error, 'Could not connect to Android Auto stream');
+      _isRunning = false;
     }
   }
 

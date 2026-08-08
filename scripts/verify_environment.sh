@@ -112,28 +112,15 @@ if [ "$IS_PI" = true ]; then
   check_pkg "libxkbcommon-dev"
   
   echo ""
-  echo -e "${CYAN}Checking Wireless Projection (Android Auto) Dependencies...${NC}"
-  check_cmd "hostapd"
-  check_cmd "dnsmasq"
-  echo ""
-fi
-
-# 5.5 Check OpenAuto (AASDK + Wireless AA)
-echo -e "${CYAN}Checking OpenAuto (Wireless Projection) Dependencies...${NC}"
+# 5. Check Native Android Auto Protocol Engine Dependencies
+echo -e "${CYAN}Checking Native Android Auto Protocol Dependencies...${NC}"
 check_cmd "nmcli" "NetworkManager (nmcli)"
-check_pkg "protobuf-compiler"
-check_pkg "libgstreamer1.0-dev"
-check_pkg "qtbase5-dev"
-
-if [ -f "/usr/local/bin/autoapp" ]; then
-  echo -e "  [${GREEN}OK${NC}] OpenAuto binary (/usr/local/bin/autoapp)"
-else
-  echo -e "  [${RED}MISSING${NC}] OpenAuto binary (/usr/local/bin/autoapp)"
-  MISSING_DEPS=$((MISSING_DEPS + 1))
-fi
+check_cmd "python3" "Python 3 Runtime"
+check_pkg "python3-usb"
 echo ""
+fi
 
-# 6. Check Groups (for Carlinkit USB dongle)
+# 6. Check System Groups
 echo -e "${CYAN}Checking System Groups...${NC}"
 if groups $USER | grep -q "\bplugdev\b"; then
   echo -e "  [${GREEN}OK${NC}] User '$USER' is in 'plugdev' group (required for USB dongles)"
