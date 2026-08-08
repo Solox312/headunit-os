@@ -21,7 +21,10 @@ class RpiHeadunitApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => VehicleProvider()),
         ChangeNotifierProvider(create: (_) => MediaProvider()),
-        ChangeNotifierProvider(create: (_) => ProjectionProvider()),
+        // Not lazy: ProjectionProvider must be constructed at startup so its
+        // USB hotplug listener (see UsbHotplugService) is active before the
+        // user ever opens the projection screen.
+        ChangeNotifierProvider(create: (_) => ProjectionProvider(), lazy: false),
         ChangeNotifierProvider(create: (_) => WifiProvider()),
         ChangeNotifierProvider(create: (_) => BluetoothProvider()),
         ChangeNotifierProvider(create: (_) => FmTransmitterProvider()),

@@ -37,9 +37,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _updateTime();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateTime());
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final vehicle = context.read<VehicleProvider>();
+      await vehicle.driverNameLoaded;
+      if (!mounted) return;
       if (vehicle.isDefaultDriverName && !vehicle.driverNamePromptSkipped) {
         _showEditDriverNameDialog(context, vehicle);
       }

@@ -3,11 +3,18 @@ import 'package:flutter/foundation.dart';
 import '../models/projection_state.dart';
 import '../services/android_auto_engine.dart';
 import '../services/projection_bridge.dart';
+import '../services/usb_hotplug_service.dart';
 import '../services/wireless_aa_bridge.dart';
 
 class ProjectionProvider extends ChangeNotifier {
   ProjectionState _state = const ProjectionState();
   StreamSubscription<AAConnectionEvent>? _aaEventSub;
+  StreamSubscription<UsbHotplugEvent>? _usbHotplugSub;
+
+  ProjectionProvider() {
+    UsbHotplugService().start();
+    _usbHotplugSub = UsbHotplugService().events.listen(_onUsbHotplugEvent);
+  }
 
   ProjectionState get state => _state;
 
@@ -106,6 +113,36 @@ class ProjectionProvider extends ChangeNotifier {
     return success;
   }
 
+  // ── USB hotplug (wired Android Auto) ─────────────────────────────────────
+
+  /// Reacts to a phone being physically plugged in/unplugged, reported by
+  /// [UsbHotplugService]. Only jumps into wired Android Auto mode from an
+  /// idle state — never interrupts an already-active wireless/CarPlay
+  /// session just because some unrelated USB device was attached.
+  void _onUsbHotplugEvent(UsbHotplugEvent event) {
+    if (event.attached) {
+      if (_state.mode != ProjectionMode.disconnected) return;
+
+      _state = _state.copyWith(
+        mode: ProjectionMode.androidAuto,
+        connectionType: ConnectionType.wired,
+        connectionStep: AAConnectionStep.waitingForPhone,
+        isConnected: false,
+        isStreaming: false,
+        deviceName: 'USB Device (${event.vendorId}:${event.productId})',
+      );
+      notifyListeners();
+
+      if (kDebugMode) {
+        print('[ProjectionProvider] USB hotplug attach -> entering wired Android Auto mode');
+      }
+      // aasdk/openauto (already running as a service) owns the actual AOAP
+      // negotiation from here; this just gets the UI out of "idle" instantly.
+    } else if (_state.connectionType == ConnectionType.wired) {
+      switchMode(ProjectionMode.disconnected);
+    }
+  }
+
   // ── Mode switching ───────────────────────────────────────────────────────
 
   void switchMode(ProjectionMode mode) {
@@ -158,6 +195,7 @@ class ProjectionProvider extends ChangeNotifier {
   @override
   void dispose() {
     _aaEventSub?.cancel();
+    _usbHotplugSub?.cancel();
     super.dispose();
   }
 }

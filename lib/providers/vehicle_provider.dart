@@ -11,6 +11,13 @@ class VehicleProvider extends ChangeNotifier {
   Timer? _liveTelemetryTimer;
   final Random _random = Random();
 
+  /// Resolves once the persisted driver name / prompt-skipped state has been
+  /// loaded from disk. Callers that gate UI on [isDefaultDriverName] or
+  /// [driverNamePromptSkipped] right after construction must await this
+  /// first, since those fields still hold their hardcoded defaults until
+  /// the async load completes.
+  late final Future<void> driverNameLoaded;
+
   VehicleStatus get status => _status;
   String get driverName => _driverName;
   bool get isDefaultDriverName => _driverName == "Change Me";
@@ -18,7 +25,7 @@ class VehicleProvider extends ChangeNotifier {
 
   VehicleProvider() {
     _startLiveSimulation();
-    _loadStoredDriverName();
+    driverNameLoaded = _loadStoredDriverName();
   }
 
   Future<void> _loadStoredDriverName() async {

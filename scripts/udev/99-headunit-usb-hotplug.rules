@@ -1,0 +1,10 @@
+# HeadUnit OS — USB hotplug notifier
+# Installed by scripts/install_usb_hotplug.sh to /etc/udev/rules.d/
+#
+# Fires on every USB device add/remove so the HeadUnit OS app can react
+# immediately (e.g. jump to the Android Auto connecting screen) instead of
+# waiting for the user to tap a button. Actual AOAP negotiation still
+# happens inside the aasdk/openauto process (scripts/install_openauto.sh) —
+# this rule only drives the UI transition.
+SUBSYSTEM=="usb", ACTION=="add", ENV{DEVTYPE}=="usb_device", RUN+="/usr/local/bin/headunit-usb-notify.sh add %k"
+SUBSYSTEM=="usb", ACTION=="remove", ENV{DEVTYPE}=="usb_device", RUN+="/usr/local/bin/headunit-usb-notify.sh remove %k"
