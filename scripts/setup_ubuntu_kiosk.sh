@@ -62,7 +62,7 @@ echo -e "${CYAN}[3/5] Building HeadUnit OS release bundle...${NC}"
 cd "$PROJECT_DIR"
 if command -v flutter &> /dev/null; then
   flutter pub get
-  flutter build bundle --release
+  flutter build bundle --target-platform=linux-x64
   echo -e "${GREEN}✓ Flutter assets bundle built successfully.${NC}"
 else
   echo -e "${YELLOW}⚠️  Flutter SDK not found in PATH. Skipping build step (assuming pre-built bundle).${NC}"
