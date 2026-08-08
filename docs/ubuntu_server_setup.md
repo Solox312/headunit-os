@@ -157,7 +157,17 @@ sudo usermod -aG plugdev,input,video,render,dialout $USER
 
 ## 7. Auto-Boot Kiosk Service Configuration
 
-Create a `systemd` service to launch HeadUnit OS automatically on system startup:
+### Option A — Automated One-Command Setup (Recommended)
+Run the automated Ubuntu kiosk setup script to install dependencies, build the release bundle, set up system permissions, and launch kiosk mode:
+
+```bash
+./scripts/setup_ubuntu_kiosk.sh
+```
+
+---
+
+### Option B — Manual Systemd Service Setup
+Create a `systemd` service manually to launch HeadUnit OS automatically on system startup:
 
 ```bash
 sudo tee /etc/systemd/system/headunit.service > /dev/null << EOF
@@ -171,7 +181,7 @@ Type=simple
 User=$USER
 Group=$USER
 WorkingDirectory=$HOME/headunit-os
-ExecStart=/usr/local/bin/flutter-pi --release $HOME/headunit-os/build/elm
+ExecStart=/usr/local/bin/flutter-pi --release $HOME/headunit-os/build/flutter_assets
 Restart=always
 RestartSec=1
 StandardOutput=journal
