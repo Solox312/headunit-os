@@ -25,15 +25,20 @@ echo ""
 
 # Configure Automotive Car Stereo Device Class (0x200408) in BlueZ
 echo -e "${CYAN}Configuring Automotive Car Stereo Bluetooth Profile (Class = 0x200408)...${NC}"
-sudo tee -a /etc/bluetooth/main.conf > /dev/null << 'EOF'
-
+sudo tee /etc/bluetooth/main.conf > /dev/null << 'EOF'
 [General]
 Name = HeadUnit OS
 Class = 0x200408
 DiscoverableTimeout = 0
 PairableTimeout = 0
 AutoConnect = true
+FastConnectable = true
+JustWorksRepairing = always
 EOF
+
+# Clear stale pairing keys to prevent PIN mismatch errors
+sudo systemctl stop bluetooth 2>/dev/null || true
+sudo rm -rf /var/lib/bluetooth/* 2>/dev/null || true
 
 # 2. Copy latest Intel Bluetooth firmware
 echo -e "${CYAN}[2/3] Fetching latest Intel Bluetooth firmware (ibt-*)...${NC}"
