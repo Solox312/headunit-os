@@ -132,22 +132,29 @@ class WifiService {
         args.addAll(['password', password]);
       }
 
-      final result = await Process.run('nmcli', args);
+      ProcessResult result = await Process.run('nmcli', args);
+
+      // Automatic fallback retry via sudo nmcli if unprivileged nmcli returns Polkit authorization error
+      if (result.exitCode != 0 && result.stderr.toString().contains('Not authorized to control networking')) {
+        if (kDebugMode) print('[WifiService] Standard nmcli unauthorized by Polkit. Retrying via sudo nmcli...');
+        result = await Process.run('sudo', ['nmcli', ...args]);
+      }
+
       if (result.exitCode == 0) {
         if (kDebugMode) print('[WifiService] Successfully connected to $ssid');
         return const WifiConnectResult(success: true);
       } else {
         final stderr = result.stderr.toString();
         if (kDebugMode) print('[WifiService] Failed to connect to $ssid: $stderr');
-        
+
         if (stderr.contains('Not authorized to control networking')) {
           return const WifiConnectResult(
             success: false,
-            errorMessage: 'NetworkManager Permission Error: Run "sudo usermod -aG netdev \$USER" on Linux.',
+            errorMessage: 'NetworkManager Permission Error: Create /etc/polkit-1/rules.d/10-networkmanager.rules or configure passwordless sudo for nmcli.',
             isPermissionDenied: true,
           );
         }
-        
+
         return WifiConnectResult(
           success: false,
           errorMessage: 'Failed to connect to "$ssid": ${stderr.trim()}',

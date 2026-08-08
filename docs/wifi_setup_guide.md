@@ -24,25 +24,38 @@ lo      loopback  unmanaged    --
 
 ---
 
-## 2. Passwordless Polkit Permissions (Optional)
+## 2. NetworkManager Polkit Authorization Fixes
 
-By default, standard Linux users in the `netdev` or `sudo` group can scan and connect to Wi-Fi networks without password prompts.
+If your Linux system throws `Error: Failed to add/activate new connection: Not authorized to control networking`, choose one of the two solutions below:
 
-If your Linux user receives permission errors when running `nmcli dev wifi connect`, ensure your user is added to the `netdev` group:
+### Option A: Create a Polkit Policy Rule (Recommended)
+
+Create `/etc/polkit-1/rules.d/10-networkmanager.rules`:
 
 ```bash
-sudo usermod -aG netdev $USER
-```
-
-Alternatively, add a Polkit policy file at `/etc/polkit-1/rules.d/50-org.freedesktop.NetworkManager.rules`:
-
-```javascript
+sudo tee /etc/polkit-1/rules.d/10-networkmanager.rules << 'EOF'
 polkit.addRule(function(action, subject) {
-    if (action.id.indexOf("org.freedesktop.NetworkManager.") == 0 &&
-        subject.isInGroup("netdev")) {
+    if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0) {
         return polkit.Result.YES;
     }
 });
+EOF
+```
+
+Restart Polkit / NetworkManager:
+```bash
+sudo systemctl restart polkit
+sudo systemctl restart NetworkManager
+```
+
+### Option B: Passwordless `sudo nmcli` Sudoers Rule
+
+HeadUnit OS automatically retries via `sudo nmcli` if standard `nmcli` returns an authorization error. Allow passwordless `sudo nmcli`:
+
+```bash
+sudo tee /etc/sudoers.d/headunit-nmcli << 'EOF'
+%sudo ALL=(ALL) NOPASSWD: /usr/bin/nmcli
+EOF
 ```
 
 ---
