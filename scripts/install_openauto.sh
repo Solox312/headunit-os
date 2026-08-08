@@ -122,11 +122,11 @@ if [[ ! -d "openauto" ]]; then
   find openauto -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
   
   # Implement missing pure virtual onAVChannelStopIndication in event handlers
-  sed -i '/onAVChannelSetupResponseMessage/a \    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication&) override {}' openauto/include/f1x/openauto/autoapp/Service/VideoService.hpp 2>/dev/null || true
-  sed -i '/onAVChannelSetupResponseMessage/a \    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication&) override {}' openauto/include/f1x/openauto/autoapp/Service/MediaAudioService.hpp 2>/dev/null || true
-  sed -i '/onAVChannelSetupResponseMessage/a \    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication&) override {}' openauto/include/f1x/openauto/autoapp/Service/SpeechAudioService.hpp 2>/dev/null || true
-  sed -i '/onAVChannelSetupResponseMessage/a \    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication&) override {}' openauto/include/f1x/openauto/autoapp/Service/SystemAudioService.hpp 2>/dev/null || true
-  sed -i '/onAVChannelSetupResponseMessage/a \    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication&) override {}' openauto/include/f1x/openauto/autoapp/Service/AudioInputService.hpp 2>/dev/null || true
+  sed -i 's/public:/public:\n    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication\&) override {}/' openauto/include/f1x/openauto/autoapp/Service/VideoService.hpp
+  sed -i 's/public:/public:\n    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication\&) override {}/' openauto/include/f1x/openauto/autoapp/Service/MediaAudioService.hpp
+  sed -i 's/public:/public:\n    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication\&) override {}/' openauto/include/f1x/openauto/autoapp/Service/SpeechAudioService.hpp
+  sed -i 's/public:/public:\n    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication\&) override {}/' openauto/include/f1x/openauto/autoapp/Service/SystemAudioService.hpp
+  sed -i 's/public:/public:\n    void onAVChannelStopIndication(const f1x::aasdk::proto::messages::AVChannelStopIndication\&) override {}/' openauto/include/f1x/openauto/autoapp/Service/AudioInputService.hpp
 fi
 cd openauto
 mkdir -p build && cd build

@@ -36,7 +36,25 @@ Fresh Ubuntu Server installations do not ship with `git`. Update your package li
 sudo apt update && sudo apt upgrade -y
 
 # 2. Install Git and basic build tools
-sudo apt install -y git curl wget build-essential cmake pkg-config
+sudo apt install -y git curl wget build-essential cmake pkg-config snapd
+```
+
+### 2.1 Install Flutter SDK
+
+Choose one of the two methods below to install Flutter:
+
+**Method A — Via Snap (Easiest & Fastest on Ubuntu/Mint):**
+```bash
+sudo snap install flutter --classic
+```
+
+**Method B — Direct Manual Installation:**
+```bash
+cd ~$
+wget https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.27.1-stable.tar.xz
+tar -xf flutter_linux_3.27.1-stable.tar.xz
+echo 'export PATH="$HOME/flutter/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 ---
