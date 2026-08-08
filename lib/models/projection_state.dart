@@ -9,6 +9,8 @@ enum ConnectionType {
   none,
   wireless,
   usbDongle,
+  wired,
+  adbDhu,
   simulator,
 }
 

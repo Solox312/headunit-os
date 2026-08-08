@@ -12,6 +12,7 @@ class ProjectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final projection = Provider.of<ProjectionProvider>(context);
+    final mode = projection.state.mode;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -42,7 +43,7 @@ class ProjectionScreen extends StatelessWidget {
                 const SizedBox(width: 8),
                 _buildModeChip(
                   context,
-                  label: "Android Auto",
+                  label: "Android Auto (DHU 5277)",
                   mode: ProjectionMode.androidAuto,
                   activeColor: AutomotiveColors.androidAutoColor,
                   icon: Icons.phone_android_rounded,
@@ -59,9 +60,9 @@ class ProjectionScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Main Video Stream / Simulator Viewport
+            // Main Video Stream Viewport
             Expanded(
-              child: projection.state.mode == ProjectionMode.disconnected
+              child: mode == ProjectionMode.disconnected
                   ? _buildDisconnectedState(context, projection)
                   : const ProjectionSimulatorCanvas(),
             ),
@@ -123,23 +124,42 @@ class ProjectionScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              "Plug in your iPhone or Android phone via USB Dongle or connect via Wireless Hotspot.",
+              "Plug in your phone via USB Dongle, connect via Wireless Hotspot, or start Head Unit Server on your phone.",
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(fontSize: 14, color: AutomotiveColors.textSecondary),
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: Text("Launch Projection Simulator", style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AutomotiveColors.electricCyan,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () {
-                projection.switchMode(ProjectionMode.simulator);
-              },
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.adb_rounded),
+                  label: Text("Connect ADB DHU (Port 5277)", style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AutomotiveColors.androidAutoColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () async {
+                    await projection.connectAdbDhuServer();
+                  },
+                ),
+                const SizedBox(width: 14),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: Text("Launch Simulator", style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AutomotiveColors.electricCyan,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    projection.switchMode(ProjectionMode.simulator);
+                  },
+                ),
+              ],
             ),
           ],
         ),

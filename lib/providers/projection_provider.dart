@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/projection_state.dart';
+import '../services/android_auto_engine.dart';
 
 class ProjectionProvider extends ChangeNotifier {
   ProjectionState _state = const ProjectionState();
@@ -11,8 +12,36 @@ class ProjectionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Connect to ADB Forwarded Android Auto Head Unit Server (127.0.0.1:5277)
+  Future<bool> connectAdbDhuServer({String host = '127.0.0.1', int port = 5277}) async {
+    final engine = AndroidAutoEngine();
+    final bool success = await engine.connectAdbDhuServer(host: host, port: port);
+
+    if (success) {
+      _state = _state.copyWith(
+        mode: ProjectionMode.androidAuto,
+        isConnected: true,
+        isStreaming: true,
+        deviceName: "Android Device (ADB DHU 5277)",
+        connectionType: ConnectionType.wired,
+        activeApp: "Android Auto",
+      );
+    } else {
+      _state = _state.copyWith(
+        mode: ProjectionMode.androidAuto,
+        isConnected: false,
+        isStreaming: false,
+        deviceName: "ADB Connection Failed ($host:$port)",
+      );
+    }
+
+    notifyListeners();
+    return success;
+  }
+
   void switchMode(ProjectionMode mode) {
     if (mode == ProjectionMode.disconnected) {
+      AndroidAutoEngine().stopSession();
       _state = _state.copyWith(
         mode: ProjectionMode.disconnected,
         isConnected: false,
@@ -29,14 +58,8 @@ class ProjectionProvider extends ChangeNotifier {
         activeApp: "Apple Maps",
       );
     } else if (mode == ProjectionMode.androidAuto) {
-      _state = _state.copyWith(
-        mode: ProjectionMode.androidAuto,
-        isConnected: true,
-        isStreaming: true,
-        deviceName: "Google Pixel 8 Pro",
-        connectionType: ConnectionType.wireless,
-        activeApp: "Google Maps",
-      );
+      // Trigger ADB DHU server connection attempt
+      connectAdbDhuServer();
     } else if (mode == ProjectionMode.simulator) {
       _state = _state.copyWith(
         mode: ProjectionMode.simulator,
@@ -56,7 +79,7 @@ class ProjectionProvider extends ChangeNotifier {
   }
 
   void handleTouchEvent(double dx, double dy, String eventType) {
-    // Touch coordinates (x, y) normalized 0.0 - 1.0 sent to USB Dongle / projection stream daemon
+    AndroidAutoEngine().sendTouchEvent(x: dx, y: dy, action: 0);
     if (kDebugMode) {
       print("Projection Touch [$eventType]: ($dx, $dy)");
     }

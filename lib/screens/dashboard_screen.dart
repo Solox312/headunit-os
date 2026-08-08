@@ -11,8 +11,13 @@ import '../models/projection_state.dart';
 
 class DashboardScreen extends StatefulWidget {
   final VoidCallback onOpenProjection;
+  final VoidCallback? onOpenMedia;
 
-  const DashboardScreen({super.key, required this.onOpenProjection});
+  const DashboardScreen({
+    super.key,
+    required this.onOpenProjection,
+    this.onOpenMedia,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -151,7 +156,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   label: "Music",
                                   icon: Icons.headphones_rounded,
                                   color: AutomotiveColors.dongleViolet,
-                                  onTap: () {},
+                                  onTap: () {
+                                    if (widget.onOpenMedia != null) {
+                                      widget.onOpenMedia!();
+                                    }
+                                  },
                                 ),
                                 _buildQuickLauncher(
                                   context,
@@ -288,6 +297,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                     flex: 4,
                     child: GlassCard(
+                      onTap: widget.onOpenMedia,
                       child: Row(
                         children: [
                           Container(
@@ -298,24 +308,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(color: AutomotiveColors.stroke, width: 1.0),
                             ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(14),
-                              child: Image.network(
-                                media.mediaItem.coverUrl,
-                                width: 64,
-                                height: 64,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Center(
-                                    child: Icon(
-                                      Icons.album_rounded,
-                                      size: 32,
-                                      color: AutomotiveColors.dongleViolet,
+                            child: media.hasMedia
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: Image.network(
+                                      media.mediaItem.coverUrl,
+                                      width: 64,
+                                      height: 64,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return const Center(
+                                          child: Icon(
+                                            Icons.album_rounded,
+                                            size: 32,
+                                            color: AutomotiveColors.dongleViolet,
+                                          ),
+                                        );
+                                      },
                                     ),
-                                  );
-                                },
-                              ),
-                            ),
+                                  )
+                                : const Center(
+                                    child: Icon(
+                                      Icons.music_off_rounded,
+                                      size: 30,
+                                      color: AutomotiveColors.textMuted,
+                                    ),
+                                  ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
@@ -324,7 +342,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  media.mediaItem.title,
+                                  media.hasMedia ? media.mediaItem.title : "No Music Playing",
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.spaceGrotesk(
@@ -335,7 +353,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  media.mediaItem.artist,
+                                  media.hasMedia ? media.mediaItem.artist : "Connect audio source or tap play",
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.inter(
@@ -355,7 +373,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 onPressed: () => media.previousTrack(),
                               ),
                               IconButton(
-                                icon: Icon(media.mediaItem.isPlaying
+                                icon: Icon(media.hasMedia && media.mediaItem.isPlaying
                                     ? Icons.pause_circle_filled_rounded
                                     : Icons.play_circle_fill_rounded),
                                 iconSize: 42,

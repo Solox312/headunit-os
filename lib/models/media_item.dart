@@ -1,4 +1,11 @@
+enum AudioSourceMode {
+  bluetooth,
+  projectionCarPlayAA,
+  auxFm,
+}
+
 class MediaItem {
+  final bool hasMedia;
   final String title;
   final String artist;
   final String album;
@@ -7,9 +14,11 @@ class MediaItem {
   final Duration position;
   final bool isPlaying;
   final double volume; // 0.0 to 1.0
-  final String source; // "Spotify", "CarPlay", "Android Auto", "Bluetooth"
+  final String source; // "Spotify", "CarPlay / AA", "Bluetooth", "Aux / FM", "None"
+  final AudioSourceMode audioMode;
 
   const MediaItem({
+    this.hasMedia = true,
     this.title = "Blinding Lights",
     this.artist = "The Weeknd",
     this.album = "After Hours",
@@ -18,10 +27,24 @@ class MediaItem {
     this.position = const Duration(minutes: 1, seconds: 12),
     this.isPlaying = true,
     this.volume = 0.75,
-    this.source = "Spotify",
+    this.source = "Bluetooth",
+    this.audioMode = AudioSourceMode.bluetooth,
   });
 
+  const MediaItem.none({this.audioMode = AudioSourceMode.bluetooth})
+      : hasMedia = false,
+        title = "No Music Playing",
+        artist = "Select a mode to start audio playback",
+        album = "Idle",
+        coverUrl = "",
+        duration = Duration.zero,
+        position = Duration.zero,
+        isPlaying = false,
+        volume = 0.75,
+        source = "None";
+
   MediaItem copyWith({
+    bool? hasMedia,
     String? title,
     String? artist,
     String? album,
@@ -31,8 +54,10 @@ class MediaItem {
     bool? isPlaying,
     double? volume,
     String? source,
+    AudioSourceMode? audioMode,
   }) {
     return MediaItem(
+      hasMedia: hasMedia ?? this.hasMedia,
       title: title ?? this.title,
       artist: artist ?? this.artist,
       album: album ?? this.album,
@@ -42,6 +67,7 @@ class MediaItem {
       isPlaying: isPlaying ?? this.isPlaying,
       volume: volume ?? this.volume,
       source: source ?? this.source,
+      audioMode: audioMode ?? this.audioMode,
     );
   }
 }

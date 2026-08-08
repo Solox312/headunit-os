@@ -42,6 +42,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       _selectedIndex = 1; // Switch to Projection Stream Screen
                     });
                   },
+                  onOpenMedia: () {
+                    setState(() {
+                      _selectedIndex = 2; // Switch to Media Screen
+                    });
+                  },
                 ),
                 const ProjectionScreen(),
                 const MediaScreen(),
