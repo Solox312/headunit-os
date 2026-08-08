@@ -101,6 +101,22 @@ if [ "$IS_PI" = true ]; then
   echo ""
 fi
 
+# 5.5 Check OpenAuto (AASDK + Wireless AA)
+echo -e "${CYAN}Checking OpenAuto (Wireless Projection) Dependencies...${NC}"
+check_cmd "nmcli" "NetworkManager (nmcli)"
+check_pkg "protobuf-compiler"
+check_pkg "libgstreamer1.0-dev"
+check_pkg "qtbase5-dev"
+
+if [ -f "/usr/local/bin/autoapp" ]; then
+  echo -e "  [${GREEN}OK${NC}] OpenAuto binary (/usr/local/bin/autoapp)"
+else
+  echo -e "  [${RED}MISSING${NC}] OpenAuto binary (/usr/local/bin/autoapp)"
+  echo "            (Run ./scripts/install_openauto.sh to compile it)"
+  MISSING_DEPS=$((MISSING_DEPS + 1))
+fi
+echo ""
+
 # 6. Check Groups (for Carlinkit USB dongle)
 echo -e "${CYAN}Checking System Groups...${NC}"
 if groups $USER | grep -q "\bplugdev\b"; then
