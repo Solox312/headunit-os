@@ -210,11 +210,23 @@ class BluetoothService {
 
   Future<bool> _isDeviceConnected(String macAddress) async {
     try {
-      final result = await Process.run('bluetoothctl', ['info', macAddress]);
-      return result.stdout.toString().contains('Connected: yes');
-    } catch (_) {
-      return false;
+      // Method 1: Check bluetoothctl info for mac
+      final infoResult = await Process.run('bluetoothctl', ['info', macAddress]);
+      final infoOutput = infoResult.stdout.toString().toLowerCase();
+      if (infoOutput.contains('connected: yes')) {
+        return true;
+      }
+
+      // Method 2: Check bluetoothctl devices Connected list
+      final connResult = await Process.run('bluetoothctl', ['devices', 'Connected']);
+      final connOutput = connResult.stdout.toString().toLowerCase();
+      if (connOutput.contains(macAddress.toLowerCase())) {
+        return true;
+      }
+    } catch (e) {
+      if (kDebugMode) print('[BluetoothService] Exception checking device connection state: $e');
     }
+    return false;
   }
 
   List<BluetoothDevice> _getMockPairedDevices() {

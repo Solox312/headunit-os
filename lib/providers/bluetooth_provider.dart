@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/bluetooth_device.dart';
 import '../services/bluetooth_service.dart';
@@ -31,6 +32,8 @@ class BluetoothProvider extends ChangeNotifier {
     }
   }
 
+  Timer? _pollingTimer;
+
   BluetoothProvider() {
     init();
   }
@@ -42,6 +45,22 @@ class BluetoothProvider extends ChangeNotifier {
       await refreshPairedDevices();
       await scanDevices();
     }
+    _startPollingTimer();
+  }
+
+  void _startPollingTimer() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (_isBluetoothEnabled && !_isScanning && !_isConnecting) {
+        await refreshPairedDevices();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> refreshPairedDevices() async {

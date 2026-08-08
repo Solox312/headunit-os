@@ -128,7 +128,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     center: Alignment.center,
                     radius: 0.85,
                     colors: [
-                      const Color(0xFF101826).withOpacity(_glowAnimation.value),
+                      const Color(0xFF101826).withValues(alpha: _glowAnimation.value),
                       const Color(0xFF0A0F18),
                       const Color(0xFF04070C),
                     ],
@@ -188,7 +188,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         borderRadius: BorderRadius.circular(3),
                         boxShadow: [
                           BoxShadow(
-                            color: AutomotiveColors.electricCyan.withOpacity(0.6),
+                            color: AutomotiveColors.electricCyan.withValues(alpha: 0.6),
                             blurRadius: 10,
                             spreadRadius: 1,
                           ),

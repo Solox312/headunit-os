@@ -73,7 +73,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               Positioned.fill(
                 child: IgnorePointer(
                   child: Container(
-                    color: Colors.black.withOpacity(dimOpacity),
+                    color: Colors.black.withValues(alpha: dimOpacity),
                   ),
                 ),
               ),

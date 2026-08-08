@@ -3,7 +3,8 @@
     "allow": [
       "Bash(flutter analyze *)",
       "Bash(flutter test *)",
-      "Bash(bash -n scripts/install_openauto.sh)"
+      "Bash(bash -n scripts/install_openauto.sh)",
+      "Bash(git status *)"
     ]
   }
 }

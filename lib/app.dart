@@ -39,7 +39,7 @@ class RpiHeadunitApp extends StatelessWidget {
         builder: (context, child) {
           return Stack(
             children: [
-              if (child != null) child,
+              child ?? const SizedBox.shrink(),
               Consumer<KeyboardProvider>(
                 builder: (context, kb, _) {
                   if (!kb.isVisible || kb.controller == null) return const SizedBox.shrink();

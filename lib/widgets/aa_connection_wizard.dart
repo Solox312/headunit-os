@@ -319,7 +319,7 @@ class _AAConnectionWizardState extends State<AAConnectionWizard>
 
     return AnimatedBuilder(
       animation: _pulseCtrl,
-      builder: (_, __) {
+      builder: (context, child) {
         final glow = isActive ? _pulseCtrl.value * 0.12 : 0.0;
         return Row(
           crossAxisAlignment: CrossAxisAlignment.center,
