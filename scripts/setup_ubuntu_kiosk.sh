@@ -62,6 +62,7 @@ echo -e "${CYAN}[3/5] Building HeadUnit OS release bundle...${NC}"
 cd "$PROJECT_DIR"
 if command -v flutter &> /dev/null; then
   flutter pub get
+  flutter precache --linux || true
   flutter build linux --release || true
   flutter build bundle --target-platform=linux-x64
   
@@ -69,7 +70,7 @@ if command -v flutter &> /dev/null; then
   mkdir -p "$PROJECT_DIR/build/linux/x64/release/bundle"
 
   # Broadly locate icudtl.dat in system, build output, or Flutter SDK cache
-  ICU_LOCATIONS=$(find "$PROJECT_DIR/build" "$HOME" "/tmp" -name "icudtl.dat" 2>/dev/null || true)
+  ICU_LOCATIONS=$(find "$PROJECT_DIR/build" "$HOME" "/tmp" "/snap" -name "icudtl.dat" 2>/dev/null || true)
   ICU_FILE=$(echo "$ICU_LOCATIONS" | head -n 1)
   
   if [ -n "$ICU_FILE" ]; then
@@ -83,17 +84,30 @@ if command -v flutter &> /dev/null; then
     echo -e "${YELLOW}⚠️  Could not locate icudtl.dat automatically.${NC}"
   fi
 
-  # Broadly locate libflutter_engine.so in system, build output, or Flutter SDK cache
-  ENGINE_FILE=""
-  if [ -f "$PROJECT_DIR/build/linux/x64/release/bundle/lib/libflutter_engine.so" ]; then
-    ENGINE_FILE="$PROJECT_DIR/build/linux/x64/release/bundle/lib/libflutter_engine.so"
-  else
-    ENGINE_FILE=$(find "$PROJECT_DIR/build" "$HOME" -name "libflutter_engine.so" 2>/dev/null | head -n 1)
-  fi
+  # Broadly locate libflutter_engine.so or download direct from Google Flutter Infra
+  ENGINE_LOCATIONS=$(find "$PROJECT_DIR/build" "$HOME" "/tmp" "/snap" -name "libflutter_engine.so" 2>/dev/null || true)
+  ENGINE_FILE=$(echo "$ENGINE_LOCATIONS" | head -n 1)
   
-  if [ -n "$ENGINE_FILE" ]; then
-    echo "Found libflutter_engine.so at $ENGINE_FILE"
+  if [ -z "$ENGINE_FILE" ]; then
+    echo -e "${YELLOW}Downloading matching libflutter_engine.so directly from Google Flutter storage...${NC}"
+    ENGINE_REV=$(cat $(which flutter 2>/dev/null | xargs readlink -f 2>/dev/null | xargs dirname 2>/dev/null | xargs dirname 2>/dev/null)/bin/internal/engine.version 2>/dev/null || echo "")
+    if [ -z "$ENGINE_REV" ]; then
+      ENGINE_REV=$(find "$HOME" "/snap" -name "engine.version" 2>/dev/null | head -n 1 | xargs cat 2>/dev/null || echo "")
+    fi
+    if [ -n "$ENGINE_REV" ]; then
+      echo "Engine Revision: $ENGINE_REV"
+      wget -q "https://storage.googleapis.com/flutter_infra_release/flutter/${ENGINE_REV}/linux-x64/linux-x64-embedder.zip" -O /tmp/flutter_embedder.zip || true
+      if [ -f /tmp/flutter_embedder.zip ]; then
+        unzip -o /tmp/flutter_embedder.zip libflutter_engine.so -d /tmp/ 2>/dev/null || true
+        ENGINE_FILE="/tmp/libflutter_engine.so"
+      fi
+    fi
+  fi
+
+  if [ -n "$ENGINE_FILE" ] && [ -f "$ENGINE_FILE" ]; then
+    echo "Installing libflutter_engine.so from $ENGINE_FILE..."
     sudo cp "$ENGINE_FILE" "/usr/local/lib/libflutter_engine.so"
+    sudo cp "$ENGINE_FILE" "/usr/lib/libflutter_engine.so" 2>/dev/null || true
     sudo ldconfig
   else
     echo -e "${YELLOW}⚠️  Could not locate libflutter_engine.so automatically.${NC}"
