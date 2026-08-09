@@ -62,10 +62,16 @@ Type=simple
 User=$CURRENT_USER
 Group=$CURRENT_USER
 Environment=QT_QPA_PLATFORM=eglfs
+Environment=QT_AUDIO_BACKEND=alsa
 Environment=XDG_RUNTIME_DIR=/run/user/$CURRENT_UID
+ExecStartPre=/bin/sh -c 'clear > /dev/tty1 2>/dev/null || true'
 ExecStart=$AUTOAPP_BIN
 Restart=no
-ExecStopPost=/usr/bin/systemctl --no-block start headunit.service
+# This unit runs as the non-root user above, so the systemctl call needs
+# sudo to satisfy polkit — the sudoers rule below grants it passwordless.
+# The flag file tells the Flutter UI to skip the splash screen and land
+# on App Connect.
+ExecStopPost=/bin/sh -c 'touch /tmp/heados-return-from-aa && chmod 777 /tmp/heados-return-from-aa && sudo /usr/bin/systemctl --no-block start headunit.service'
 
 [Install]
 # Intentionally not enabled at boot — started on demand by the app (USB
