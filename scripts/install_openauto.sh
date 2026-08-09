@@ -140,7 +140,7 @@ cmake .. \
   -DCMAKE_CXX_FLAGS="-fpermissive" \
   -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
   -DAASDK_INCLUDE_DIRS="$INSTALL_PREFIX/include" \
-  -DAASDK_LIBRARIES="$INSTALL_PREFIX/lib/libaasdk.so"
+  -DAASDK_LIBRARIES="$INSTALL_PREFIX/lib/libaasdk.so;$INSTALL_PREFIX/lib/libaasdk_proto.so"
 make -j"$(nproc)"
 
 # Same author, same era as aasdk — assume it may also lack install() rules
