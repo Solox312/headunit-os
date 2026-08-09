@@ -264,7 +264,7 @@ class AvrcpService {
   Future<void> sendPlay(String macAddress) async {
     final devPath = macAddress.replaceAll(':', '_');
     await Process.run('dbus-send', [
-      '--system', '--print-reply',
+      '--system',
       '--dest=org.bluez',
       '/org/bluez/hci0/dev_$devPath/player0',
       'org.bluez.MediaPlayer1.Play',
@@ -275,7 +275,7 @@ class AvrcpService {
   Future<void> sendPause(String macAddress) async {
     final devPath = macAddress.replaceAll(':', '_');
     await Process.run('dbus-send', [
-      '--system', '--print-reply',
+      '--system',
       '--dest=org.bluez',
       '/org/bluez/hci0/dev_$devPath/player0',
       'org.bluez.MediaPlayer1.Pause',
@@ -286,7 +286,7 @@ class AvrcpService {
   Future<void> sendNext(String macAddress) async {
     final devPath = macAddress.replaceAll(':', '_');
     await Process.run('dbus-send', [
-      '--system', '--print-reply',
+      '--system',
       '--dest=org.bluez',
       '/org/bluez/hci0/dev_$devPath/player0',
       'org.bluez.MediaPlayer1.Next',
@@ -297,7 +297,7 @@ class AvrcpService {
   Future<void> sendPrevious(String macAddress) async {
     final devPath = macAddress.replaceAll(':', '_');
     await Process.run('dbus-send', [
-      '--system', '--print-reply',
+      '--system',
       '--dest=org.bluez',
       '/org/bluez/hci0/dev_$devPath/player0',
       'org.bluez.MediaPlayer1.Previous',
