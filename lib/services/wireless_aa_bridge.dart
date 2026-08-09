@@ -123,9 +123,10 @@ class WirelessAABridge {
 
   Future<void> _createHotspot() async {
     // Check if the profile already exists; create it if not.
-    final check = await Process.run('nmcli', ['connection', 'show', _hotspotConnectionName]);
+    final check = await Process.run('sudo', ['nmcli', 'connection', 'show', _hotspotConnectionName]);
     if (check.exitCode != 0) {
-      final result = await Process.run('nmcli', [
+      final result = await Process.run('sudo', [
+        'nmcli',
         'connection', 'add',
         'type', 'wifi',
         'con-name', _hotspotConnectionName,
@@ -141,7 +142,7 @@ class WirelessAABridge {
       }
     }
 
-    final up = await Process.run('nmcli', ['connection', 'up', _hotspotConnectionName]);
+    final up = await Process.run('sudo', ['nmcli', 'connection', 'up', _hotspotConnectionName]);
     if (up.exitCode != 0) {
       throw Exception('nmcli up failed: ${up.stderr}');
     }
