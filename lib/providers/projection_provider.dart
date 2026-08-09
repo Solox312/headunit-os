@@ -11,16 +11,38 @@ class ProjectionProvider extends ChangeNotifier {
   ProjectionState _state = const ProjectionState();
   StreamSubscription<AAConnectionEvent>? _aaEventSub;
   StreamSubscription<UsbHotplugEvent>? _usbHotplugSub;
+  bool _isUsbConnected = false;
+
+  bool get isUsbConnected => _isUsbConnected;
 
   ProjectionProvider() {
     UsbHotplugService().start();
     _usbHotplugSub = UsbHotplugService().events.listen(_onUsbHotplugEvent);
+    checkInitialUsbState();
 
     // Subscribe for the app's lifetime and keep the AA Wireless SDP profile
     // advertised from startup — the phone may initiate the connection at any
     // moment (e.g. right after pairing), not just while the wizard is open.
     _aaEventSub = WirelessAABridge().events.listen(_onAAEvent);
     WirelessAABridge().ensureHandoffDaemon();
+  }
+
+  Future<void> checkInitialUsbState() async {
+    if (!Platform.isLinux) return;
+    try {
+      final res = await Process.run('lsusb', []);
+      if (res.exitCode == 0) {
+        final stdout = res.stdout as String;
+        final hasPhone = stdout.contains('18d1:') ||
+            stdout.contains('04e8:') ||
+            stdout.contains('22b8:') ||
+            stdout.contains('0bb4:') ||
+            stdout.contains('2717:') ||
+            stdout.contains('05ac:');
+        _isUsbConnected = hasPhone;
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   ProjectionState get state => _state;
@@ -130,6 +152,9 @@ class ProjectionProvider extends ChangeNotifier {
   /// idle state — never interrupts an already-active wireless/CarPlay
   /// session just because some unrelated USB device was attached.
   void _onUsbHotplugEvent(UsbHotplugEvent event) {
+    _isUsbConnected = event.attached;
+    notifyListeners();
+
     if (event.attached) {
       if (_state.mode != ProjectionMode.disconnected) return;
 

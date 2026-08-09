@@ -165,10 +165,13 @@ class ProjectionScreen extends StatelessWidget {
                   id: 'btn_android_auto_wired',
                   icon: Icons.usb_rounded,
                   title: "Wired Android Auto",
-                  subtitle: "USB Cable",
+                  subtitle: projection.isUsbConnected ? "USB Cable" : "No USB Device",
                   accentColor: AutomotiveColors.androidAutoColor,
-                  badge: "PLUG & PLAY",
-                  onTap: () => projection.switchMode(ProjectionMode.androidAuto),
+                  badge: projection.isUsbConnected ? "PLUG & PLAY" : "NO USB",
+                  isDisabled: !projection.isUsbConnected,
+                  onTap: projection.isUsbConnected
+                      ? () => projection.switchMode(ProjectionMode.androidAuto)
+                      : null,
                 ),
                 const SizedBox(width: 14),
                 _ConnectionOptionCard(
@@ -206,7 +209,8 @@ class _ConnectionOptionCard extends StatefulWidget {
   final String subtitle;
   final Color accentColor;
   final String? badge;
-  final VoidCallback onTap;
+  final bool isDisabled;
+  final VoidCallback? onTap;
 
   const _ConnectionOptionCard({
     required this.id,
@@ -214,8 +218,9 @@ class _ConnectionOptionCard extends StatefulWidget {
     required this.title,
     required this.subtitle,
     required this.accentColor,
-    required this.onTap,
+    this.onTap,
     this.badge,
+    this.isDisabled = false,
   });
 
   @override
@@ -246,85 +251,97 @@ class _ConnectionOptionCardState extends State<_ConnectionOptionCard>
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = widget.isDisabled ? AutomotiveColors.textMuted : widget.accentColor;
+
     return MouseRegion(
+      cursor: widget.isDisabled ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
       onEnter: (_) {
+        if (widget.isDisabled) return;
         setState(() => _hovered = true);
         _hoverCtrl.forward();
       },
       onExit: (_) {
+        if (widget.isDisabled) return;
         setState(() => _hovered = false);
         _hoverCtrl.reverse();
       },
       child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedBuilder(
-          animation: _glowAnim,
-          builder: (_, child) {
-            return Container(
-              width: 180,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: widget.accentColor.withValues(alpha: 0.06 + _glowAnim.value * 0.06),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: widget.accentColor.withValues(alpha: 0.25 + _glowAnim.value * 0.45),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  if (_hovered)
-                    BoxShadow(
-                      color: widget.accentColor.withValues(alpha: 0.15),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                ],
-              ),
-              child: child,
-            );
-          },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Icon(widget.icon, color: widget.accentColor, size: 22),
-                  if (widget.badge != null) ...[
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: widget.accentColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
+        onTap: widget.isDisabled ? null : widget.onTap,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 250),
+          opacity: widget.isDisabled ? 0.38 : 1.0,
+          child: AnimatedBuilder(
+            animation: _glowAnim,
+            builder: (_, child) {
+              return Container(
+                width: 180,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: effectiveColor.withValues(alpha: widget.isDisabled ? 0.02 : 0.06 + _glowAnim.value * 0.06),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: effectiveColor.withValues(alpha: widget.isDisabled ? 0.12 : 0.25 + _glowAnim.value * 0.45),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    if (_hovered && !widget.isDisabled)
+                      BoxShadow(
+                        color: effectiveColor.withValues(alpha: 0.15),
+                        blurRadius: 20,
+                        spreadRadius: 2,
                       ),
-                      child: Text(
-                        widget.badge!,
-                        style: GoogleFonts.inter(
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                          color: widget.accentColor,
-                          letterSpacing: 0.5,
+                  ],
+                ),
+                child: child,
+              );
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Icon(widget.icon, color: effectiveColor, size: 22),
+                    if (widget.badge != null) ...[
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: effectiveColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          widget.badge!,
+                          style: GoogleFonts.inter(
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                            color: effectiveColor,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                widget.title,
-                style: GoogleFonts.spaceGrotesk(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: AutomotiveColors.textPrimary,
                 ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                widget.subtitle,
-                style: GoogleFonts.inter(fontSize: 11, color: AutomotiveColors.textSecondary),
-              ),
-            ],
+                const SizedBox(height: 12),
+                Text(
+                  widget.title,
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: widget.isDisabled ? AutomotiveColors.textMuted : AutomotiveColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  widget.subtitle,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: AutomotiveColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
