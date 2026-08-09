@@ -2,26 +2,31 @@
 # ==============================================================================
 #  HeadUnit OS — Wireless Android Auto Bluetooth Handoff Daemon
 #
-#  Registers the Android Auto Wireless RFCOMM profile with BlueZ via D-Bus
-#  (org.bluez.ProfileManager1 — no deprecated sdptool, no bluetoothd -C
-#  needed). When the phone pairs and connects to the profile, performs the
-#  Wi-Fi credential handshake that tells it to join our hotspot and open a
-#  TCP connection to the head unit's Android Auto socket:
+#  Wireless Android Auto is HEAD-UNIT-INITIATED: the phone hosts an RFCOMM
+#  service with the AA Wireless UUID, and the car connects to it after the
+#  Bluetooth link comes up (this is why real cars start AA the moment you
+#  get in). This daemon:
 #
-#    HU  -> phone : WifiStartRequest  { ip_address, port }
-#    phone -> HU  : WifiInfoRequest
-#    HU  -> phone : WifiInfoResponse  { ssid, key, bssid, security, ap_type }
-#    phone joins the hotspot and dials <ip_address>:<port>
+#    1. Registers an org.bluez Profile for the AA Wireless UUID — required
+#       so BlueZ hands the resulting connection fd to our NewConnection
+#       handler when ConnectProfile succeeds.
+#    2. Watches for phone connections (already-connected devices at startup
+#       + D-Bus PropertiesChanged Connected=true events).
+#    3. Calls org.bluez.Device1.ConnectProfile(AA_UUID) on the phone with
+#       retries — BlueZ performs SDP on the phone, finds ITS record, and
+#       opens the RFCOMM channel to it.
+#    4. Performs the Wi-Fi credential handshake over that link:
+#         HU  -> phone : WifiStartRequest  { ip_address, port }
+#         phone -> HU  : WifiInfoRequest
+#         HU  -> phone : WifiInfoResponse  { ssid, key, bssid, security, ap }
+#       after which the phone joins the hotspot and dials <ip>:<port>.
 #
-#  Wire format on the RFCOMM link: big-endian u16 payload length, big-endian
-#  u16 message id, then a protobuf payload (hand-encoded below — the messages
-#  are tiny and this keeps the daemon dependency-free beyond python3-dbus).
+#  Wire format: big-endian u16 payload length, big-endian u16 message id,
+#  then a protobuf payload (hand-encoded — keeps the daemon dependency-free
+#  beyond python3-dbus/python3-gi, preinstalled on Mint/RPi OS desktop).
 #
-#  Lifecycle events are printed to stdout as single "EVENT:..." lines for the
-#  Flutter app (WirelessAABridge) to parse. Runs until SIGTERM.
-#
-#  Dependencies (preinstalled on Mint/RPi OS desktop images):
-#    sudo apt install python3-dbus python3-gi
+#  Lifecycle events are printed to stdout as single "EVENT:..." lines for
+#  the Flutter app (WirelessAABridge) to parse. Runs until SIGTERM.
 #
 #  Usage:
 #    python3 aa_wireless_handoff.py --ssid HeadUnit-OS --psk headunit2024 \
@@ -33,6 +38,7 @@ import select
 import struct
 import sys
 import threading
+import time
 
 def emit(event):
     print(f"EVENT:{event}", flush=True)
@@ -49,13 +55,6 @@ except ImportError as exc:
 AA_WIRELESS_UUID = "4de17a00-52cb-11e6-bdf4-0800200c9a66"
 PROFILE_PATH = "/org/headunitos/aa_wireless"
 
-# Android Auto only offers the wireless handshake to devices it classifies as
-# car/headset units, which requires an audio profile in the SDP record.
-# Reference implementations (WirelessAndroidAutoDongle, aa-proxy-rs) register
-# a stub HSP Headset profile alongside the AA UUID for exactly this reason.
-HSP_HS_UUID = "00001108-0000-1000-8000-00805f9b34fb"
-HSP_PROFILE_PATH = "/org/headunitos/hsp_stub"
-
 # Message ids on the RFCOMM handoff link
 MSG_WIFI_START_REQUEST = 1
 MSG_WIFI_INFO_REQUEST = 2
@@ -66,6 +65,14 @@ MSG_WIFI_START_RESPONSE = 7
 # WifiInfoResponse enums
 SECURITY_WPA2_PERSONAL = 8
 ACCESS_POINT_STATIC = 0
+
+CONNECT_ATTEMPTS = 10
+CONNECT_RETRY_DELAY_S = 3
+
+_bus = None
+_lock = threading.Lock()
+_active_devices = set()      # device paths with a live handoff link
+_attempting_devices = set()  # device paths with a connect loop in flight
 
 
 # ── Minimal protobuf encoding ─────────────────────────────────────────────────
@@ -153,7 +160,7 @@ def detect_bssid(explicit):
     return "00:00:00:00:00:00"
 
 
-def handle_connection(fd, config):
+def handle_connection(fd, config, device_path):
     try:
         write_frame(fd, MSG_WIFI_START_REQUEST,
                     encode_wifi_start_request(config.ip, config.port))
@@ -179,10 +186,63 @@ def handle_connection(fd, config):
     except OSError as exc:
         emit(f"ERROR rfcomm i/o failed: {exc}")
     finally:
+        with _lock:
+            _active_devices.discard(device_path)
         try:
             os.close(fd)
         except OSError:
             pass
+
+
+# ── Outgoing connection management (head unit dials the phone) ────────────────
+
+def start_connect_loop(device_path):
+    with _lock:
+        if device_path in _active_devices or device_path in _attempting_devices:
+            return
+        _attempting_devices.add(device_path)
+    threading.Thread(target=_connect_loop, args=(device_path,), daemon=True).start()
+
+
+def _connect_loop(device_path):
+    try:
+        emit(f"PHONE_SEEN {device_path}")
+        for attempt in range(1, CONNECT_ATTEMPTS + 1):
+            with _lock:
+                if device_path in _active_devices:
+                    return
+            try:
+                device = dbus.Interface(_bus.get_object("org.bluez", device_path),
+                                        "org.bluez.Device1")
+                device.ConnectProfile(AA_WIRELESS_UUID, timeout=30)
+                emit(f"CONNECT_PROFILE_OK {device_path}")
+                return  # BlueZ delivers the fd via Profile1.NewConnection
+            except dbus.exceptions.DBusException as exc:
+                name = exc.get_dbus_name() or ""
+                if "AlreadyConnected" in name or "InProgress" in name:
+                    return
+                emit(f"CONNECT_ATTEMPT_FAILED attempt={attempt} device={device_path} error={name}: {exc}")
+                time.sleep(CONNECT_RETRY_DELAY_S)
+        emit(f"CONNECT_GAVE_UP {device_path}")
+    finally:
+        with _lock:
+            _attempting_devices.discard(device_path)
+
+
+def on_properties_changed(interface, changed, invalidated, path=None):
+    if interface != "org.bluez.Device1" or path is None:
+        return
+    if bool(changed.get("Connected", False)):
+        start_connect_loop(str(path))
+
+
+def connect_already_connected_devices():
+    om = dbus.Interface(_bus.get_object("org.bluez", "/"),
+                        "org.freedesktop.DBus.ObjectManager")
+    for path, interfaces in om.GetManagedObjects().items():
+        device = interfaces.get("org.bluez.Device1")
+        if device and bool(device.get("Connected", False)):
+            start_connect_loop(str(path))
 
 
 # ── BlueZ Profile1 implementation ─────────────────────────────────────────────
@@ -195,9 +255,12 @@ class AAWirelessProfile(dbus.service.Object):
     @dbus.service.method("org.bluez.Profile1", in_signature="oha{sv}", out_signature="")
     def NewConnection(self, device, fd, fd_properties):
         raw_fd = fd.take()  # take ownership so BlueZ doesn't close it under us
-        emit(f"PHONE_CONNECTED {device}")
+        device_path = str(device)
+        with _lock:
+            _active_devices.add(device_path)
+        emit(f"PHONE_CONNECTED {device_path}")
         threading.Thread(target=handle_connection,
-                         args=(raw_fd, self._config), daemon=True).start()
+                         args=(raw_fd, self._config, device_path), daemon=True).start()
 
     @dbus.service.method("org.bluez.Profile1", in_signature="o", out_signature="")
     def RequestDisconnection(self, device):
@@ -208,105 +271,48 @@ class AAWirelessProfile(dbus.service.Object):
         emit("PROFILE_RELEASED")
 
 
-class StubAudioProfile(dbus.service.Object):
-    """Parks incoming HSP connections — exists only so the SDP record makes
-    the phone classify us as a car unit (see HSP_HS_UUID note above)."""
-
-    @dbus.service.method("org.bluez.Profile1", in_signature="oha{sv}", out_signature="")
-    def NewConnection(self, device, fd, fd_properties):
-        os.close(fd.take())
-
-    @dbus.service.method("org.bluez.Profile1", in_signature="o", out_signature="")
-    def RequestDisconnection(self, device):
-        pass
-
-    @dbus.service.method("org.bluez.Profile1", in_signature="", out_signature="")
-    def Release(self):
-        pass
-
-
 def main():
+    global _bus
+
     parser = argparse.ArgumentParser(description="Wireless Android Auto BT handoff daemon")
     parser.add_argument("--ssid", required=True)
     parser.add_argument("--psk", required=True)
     parser.add_argument("--ip", default="10.42.0.1",
                         help="Head unit IP on the hotspot (nmcli shared-mode default)")
     parser.add_argument("--port", type=int, default=50001)
-    parser.add_argument("--channel", type=int, default=8, help="RFCOMM channel")
     parser.add_argument("--bssid", default=None, help="Hotspot BSSID (auto-detected if omitted)")
     config = parser.parse_args()
 
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-    bus = dbus.SystemBus()
+    _bus = dbus.SystemBus()
 
-    AAWirelessProfile(bus, PROFILE_PATH, config)
+    AAWirelessProfile(_bus, PROFILE_PATH, config)
 
-    manager = dbus.Interface(bus.get_object("org.bluez", "/org/bluez"),
+    manager = dbus.Interface(_bus.get_object("org.bluez", "/org/bluez"),
                              "org.bluez.ProfileManager1")
-
-    # Explicit SDP record — BlueZ's auto-generated record from the bare
-    # RegisterProfile options proved unreliable (record absent from
-    # `sdptool browse local`), so spell out ServiceClassIDList, the
-    # L2CAP/RFCOMM protocol descriptor with our channel, browse group,
-    # and service name exactly.
-    service_record = f"""<?xml version="1.0" encoding="UTF-8" ?>
-<record>
-  <attribute id="0x0001">
-    <sequence>
-      <uuid value="{AA_WIRELESS_UUID}"/>
-    </sequence>
-  </attribute>
-  <attribute id="0x0004">
-    <sequence>
-      <sequence>
-        <uuid value="0x0100"/>
-      </sequence>
-      <sequence>
-        <uuid value="0x0003"/>
-        <uint8 value="0x{config.channel:02x}"/>
-      </sequence>
-    </sequence>
-  </attribute>
-  <attribute id="0x0005">
-    <sequence>
-      <uuid value="0x1002"/>
-    </sequence>
-  </attribute>
-  <attribute id="0x0100">
-    <text value="Android Auto Wireless"/>
-  </attribute>
-</record>"""
-
     try:
+        # No Role restriction: we mainly connect outward (ConnectProfile),
+        # but stay open to phone-initiated connections too.
         manager.RegisterProfile(PROFILE_PATH, AA_WIRELESS_UUID, {
             "Name": "Android Auto Wireless",
-            "Role": "server",
-            "Channel": dbus.UInt16(config.channel),
             "RequireAuthentication": dbus.Boolean(False),
             "RequireAuthorization": dbus.Boolean(False),
-            "ServiceRecord": service_record,
         })
     except dbus.exceptions.DBusException as exc:
         emit(f"ERROR profile registration failed: {exc}")
         sys.exit(1)
 
-    emit(f"PROFILE_REGISTERED uuid={AA_WIRELESS_UUID} channel={config.channel}")
+    emit(f"PROFILE_REGISTERED uuid={AA_WIRELESS_UUID}")
 
-    # Best-effort: PulseAudio/PipeWire may already advertise HSP/HFP, in
-    # which case BlueZ rejects this as a duplicate — that's fine, the phone
-    # just needs *some* audio profile present.
-    try:
-        StubAudioProfile(bus, HSP_PROFILE_PATH)
-        manager.RegisterProfile(HSP_PROFILE_PATH, HSP_HS_UUID, {
-            "Name": "HeadUnit HSP",
-            "Role": "server",
-            "Channel": dbus.UInt16(6),
-            "RequireAuthentication": dbus.Boolean(False),
-            "RequireAuthorization": dbus.Boolean(False),
-        })
-        emit("HSP_STUB_REGISTERED")
-    except dbus.exceptions.DBusException as exc:
-        emit(f"HSP_STUB_SKIPPED {exc}")
+    # Watch for phones connecting, and dial any phone that's already here.
+    _bus.add_signal_receiver(
+        on_properties_changed,
+        dbus_interface="org.freedesktop.DBus.Properties",
+        signal_name="PropertiesChanged",
+        arg0="org.bluez.Device1",
+        path_keyword="path",
+    )
+    connect_already_connected_devices()
 
     loop = GLib.MainLoop()
     try:
