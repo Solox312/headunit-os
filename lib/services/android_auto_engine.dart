@@ -29,54 +29,68 @@ class AndroidAutoEngine {
   Stream<String> get statusStream => _statusStreamController.stream;
   Stream<AAEngineState> get stateStream => _stateStreamController.stream;
 
-  /// Connect to Native Android Auto Server over TCP (Wi-Fi 50001 or USB ADB 5277)
-  Future<bool> connectNativeSocket({String host = '127.0.0.1', int port = 50001}) async {
+  ServerSocket? _serverSocket;
+
+  /// Start Native Android Auto Server Socket listening for incoming connections on port 50001 (Wi-Fi) or 5277 (ADB)
+  Future<bool> connectNativeSocket({String host = '0.0.0.0', int port = 50001}) async {
     try {
       _setState(AAEngineState.handshakeActive);
       if (kDebugMode) {
-        print("[AndroidAutoEngine] Attempting TCP Socket Connection to Native AA Protocol Server at $host:$port...");
+        print("[AndroidAutoEngine] Binding ServerSocket listening on 0.0.0.0:$port for incoming Android Auto connections...");
       }
 
-      _aaSocket = await Socket.connect(host, port, timeout: const Duration(seconds: 3));
-      _isSessionActive = true;
-      _setState(AAEngineState.streamingActive);
-
-      _statusStreamController.add("Connected to Native AA Protocol Engine on port $port");
+      _serverSocket?.close();
+      _serverSocket = await ServerSocket.bind(InternetAddress.anyIPv4, port);
+      
+      _statusStreamController.add("Listening for Android Auto phone connection on port $port...");
       if (kDebugMode) {
-        print("[AndroidAutoEngine] Successfully connected TCP Socket to $host:$port!");
+        print("[AndroidAutoEngine] ServerSocket bound to port $port — waiting for phone connection!");
       }
 
-      // Listen for incoming byte packets and demux using AAPacket header codec
-      _aaSocket!.listen(
-        (Uint8List rawBytes) {
-          _handleIncomingRawBytes(rawBytes);
+      // Wait for incoming socket connection from phone
+      final socketCompleter = Completer<bool>();
+
+      _serverSocket!.listen(
+        (Socket clientSocket) {
+          _aaSocket = clientSocket;
+          _isSessionActive = true;
+          _setState(AAEngineState.streamingActive);
+          _statusStreamController.add("Phone connected via TCP socket on port $port!");
+          if (kDebugMode) {
+            print("[AndroidAutoEngine] Incoming phone connection accepted from ${clientSocket.remoteAddress.address}:${clientSocket.remotePort}!");
+          }
+
+          if (!socketCompleter.isCompleted) {
+            socketCompleter.complete(true);
+          }
+
+          // Listen for incoming byte packets and demux using AAPacket header codec
+          clientSocket.listen(
+            (Uint8List rawBytes) {
+              _handleIncomingRawBytes(rawBytes);
+            },
+            onError: (error) {
+              if (kDebugMode) print("[AndroidAutoEngine] Socket Error: $error");
+              stopSession();
+            },
+            onDone: () {
+              if (kDebugMode) print("[AndroidAutoEngine] Phone closed socket connection.");
+              stopSession();
+            },
+          );
         },
         onError: (error) {
-          if (kDebugMode) {
-            print("[AndroidAutoEngine] Socket Error: $error");
-          }
-          stopSession();
-        },
-        onDone: () {
-          if (kDebugMode) {
-            print("[AndroidAutoEngine] Socket connection closed by remote phone.");
-          }
-          stopSession();
+          if (kDebugMode) print("[AndroidAutoEngine] ServerSocket error: $error");
+          if (!socketCompleter.isCompleted) socketCompleter.complete(false);
         },
       );
 
+      // Return true once socket server is bound & listening
       return true;
     } catch (e) {
-      if (kDebugMode) {
-        print("[AndroidAutoEngine] Notice: Native socket $host:$port unavailable ($e). Fallback to simulated stream.");
-      }
-      _statusStreamController.add("Native AA Engine standby active ($host:$port)");
-      _isSessionActive = true;
-      _setState(AAEngineState.streamingActive);
-      return true;
+      if (kDebugMode) print("[AndroidAutoEngine] ServerSocket bind exception: $e");
+      return false;
     }
-  }
-
   /// Compatibility alias for ADB DHU server connection
   Future<bool> connectAdbDhuServer({String host = '127.0.0.1', int port = 5277}) {
     return connectNativeSocket(host: host, port: port);
