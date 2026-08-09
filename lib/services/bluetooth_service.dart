@@ -142,7 +142,9 @@ class BluetoothService {
     }
 
     try {
-      final result = await Process.run('bluetoothctl', ['paired-devices']);
+      // 'bluetoothctl paired-devices' is invalid as a CLI arg on BlueZ 5.64+ (Ubuntu 24.04).
+      // Use 'bluetoothctl devices Paired' instead.
+      final result = await Process.run('bluetoothctl', ['devices', 'Paired']);
       if (result.exitCode != 0) return _getMockPairedDevices();
 
       final List<BluetoothDevice> paired = [];
