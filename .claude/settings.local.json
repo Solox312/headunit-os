@@ -4,7 +4,12 @@
       "Bash(flutter analyze *)",
       "Bash(flutter test *)",
       "Bash(bash -n scripts/install_openauto.sh)",
-      "Bash(git status *)"
+      "Bash(git status *)",
+      "Bash(python -m py_compile scripts/aa_wireless_handoff.py)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git commit *)"
     ]
   }
 }
