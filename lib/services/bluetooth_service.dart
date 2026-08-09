@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/bluetooth_device.dart';
@@ -29,28 +30,50 @@ class BluetoothService {
   }
 
   Process? _persistentAgentProcess;
+  StreamSubscription<String>? _agentOutputSub;
 
-  /// Initialize Linux Mint & Raspberry Pi Bluetooth Stack (rfkill unblock + BlueZ agent setup)
+  /// Initialize Linux Mint & Raspberry Pi Bluetooth Stack (rfkill unblock + BlueZ agent setup).
+  /// Uses DisplayYesNo agent with auto-confirm to handle Numeric Comparison pairing
+  /// (required by Android phones like Samsung, Xiaomi, etc. that reject NoInputNoOutput).
   Future<bool> initLinuxBluetooth() async {
     if (!await isBluetoothctlAvailable()) return true;
 
     try {
-      // 1. Unblock Bluetooth radio via rfkill (works on Linux Mint & RPi OS)
       await Process.run('rfkill', ['unblock', 'bluetooth']);
       await Process.run('bluetoothctl', ['power', 'on']);
       await Process.run('bluetoothctl', ['system-alias', 'HeadUnit OS']);
       await Process.run('bluetoothctl', ['discoverable', 'on']);
       await Process.run('bluetoothctl', ['pairable', 'on']);
 
-      // 2. Launch persistent interactive bluetoothctl process to keep NoInputNoOutput agent active
+      // Launch persistent interactive bluetoothctl with DisplayYesNo agent.
+      // We listen to stdout and auto-respond 'yes' to any passkey confirmation
+      // so the user never has to manually confirm pairing on the headunit.
       _persistentAgentProcess?.kill();
+      _agentOutputSub?.cancel();
       _persistentAgentProcess = await Process.start('bluetoothctl', []);
-      _persistentAgentProcess!.stdin.writeln('agent NoInputNoOutput');
+
+      _persistentAgentProcess!.stdin.writeln('agent DisplayYesNo');
       _persistentAgentProcess!.stdin.writeln('default-agent');
       _persistentAgentProcess!.stdin.writeln('discoverable on');
       _persistentAgentProcess!.stdin.writeln('pairable on');
 
-      if (kDebugMode) print('[BluetoothService] Initialized Linux Mint & RPi BlueZ stack with persistent auto-accept agent.');
+      // Auto-confirm any passkey / authorization request
+      final agentStream = _persistentAgentProcess!.stdout
+          .transform(const SystemEncoding().decoder)
+          .transform(const LineSplitter());
+      _agentOutputSub = agentStream.listen((line) {
+        if (kDebugMode) print('[BT-Agent] $line');
+        final l = line.toLowerCase();
+        if (l.contains('confirm passkey') || l.contains('(yes/no)')) {
+          _persistentAgentProcess!.stdin.writeln('yes');
+          if (kDebugMode) print('[BT-Agent] Auto-confirmed passkey.');
+        } else if (l.contains('authorize service') || l.contains('request authorization')) {
+          _persistentAgentProcess!.stdin.writeln('yes');
+          if (kDebugMode) print('[BT-Agent] Auto-authorized service.');
+        }
+      });
+
+      if (kDebugMode) print('[BluetoothService] Persistent DisplayYesNo auto-confirm agent running.');
       return true;
     } catch (e) {
       if (kDebugMode) print('[BluetoothService] Exception initializing Linux Bluetooth: $e');
