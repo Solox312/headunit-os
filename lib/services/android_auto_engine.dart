@@ -91,6 +91,8 @@ class AndroidAutoEngine {
       if (kDebugMode) print("[AndroidAutoEngine] ServerSocket bind exception: $e");
       return false;
     }
+  }
+
   /// Compatibility alias for ADB DHU server connection
   Future<bool> connectAdbDhuServer({String host = '127.0.0.1', int port = 5277}) {
     return connectNativeSocket(host: host, port: port);
