@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/bluetooth_device.dart';
-import '../models/media_item.dart';
 import '../services/bluetooth_service.dart';
 import '../services/avrcp_service.dart';
 

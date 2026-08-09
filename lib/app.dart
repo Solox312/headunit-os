@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'theme/automotive_theme.dart';
 import 'providers/vehicle_provider.dart';
 import 'providers/media_provider.dart';
+import 'models/media_item.dart';
 import 'providers/projection_provider.dart';
 import 'providers/wifi_provider.dart';
 import 'providers/bluetooth_provider.dart';
