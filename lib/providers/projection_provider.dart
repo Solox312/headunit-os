@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/projection_state.dart';
 import '../services/android_auto_engine.dart';
@@ -145,10 +146,38 @@ class ProjectionProvider extends ChangeNotifier {
       if (kDebugMode) {
         print('[ProjectionProvider] USB hotplug attach -> entering wired Android Auto mode');
       }
-      // aasdk/openauto (already running as a service) owns the actual AOAP
-      // negotiation from here; this just gets the UI out of "idle" instantly.
+
+      // A Google-vendor USB device (18d1 = Pixel and most Android phones in
+      // MTP mode) means a phone was plugged in for Android Auto — hand the
+      // display to the openauto engine, which owns AOAP + the real AA
+      // protocol. Non-Google devices just get the UI state change above.
+      if (event.vendorId.toLowerCase() == '18d1') {
+        launchWiredAndroidAuto();
+      }
     } else if (_state.connectionType == ConnectionType.wired) {
       switchMode(ProjectionMode.disconnected);
+    }
+  }
+
+  /// Hands the display over to openauto for a wired Android Auto session.
+  ///
+  /// Starting openauto.service stops headunit.service (systemd Conflicts=),
+  /// so THIS PROCESS DIES as part of the handover — autoapp takes the
+  /// screen, and when it exits, the unit's ExecStopPost restarts the kiosk
+  /// UI. Requires scripts/install_wired_aa.sh to have been run (unit +
+  /// sudoers). No-op off Linux.
+  Future<void> launchWiredAndroidAuto() async {
+    if (!Platform.isLinux) return;
+    if (kDebugMode) {
+      print('[ProjectionProvider] Handing display to openauto (wired Android Auto)…');
+    }
+    final result = await Process.run(
+        'sudo', ['systemctl', 'start', 'openauto.service']);
+    if (result.exitCode != 0) {
+      if (kDebugMode) {
+        print('[ProjectionProvider] Handover failed (${result.exitCode}): '
+            '${result.stderr} — is scripts/install_wired_aa.sh installed?');
+      }
     }
   }
 
