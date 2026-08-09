@@ -157,13 +157,13 @@ class ProjectionProvider extends ChangeNotifier {
   Future<void> launchWiredAndroidAuto() async {
     if (!Platform.isLinux) return;
     if (kDebugMode) {
-      print('[ProjectionProvider] Handing display over to openauto (wired Android Auto)…');
+      print('[ProjectionProvider] Starting openauto background projection engine…');
     }
     final result = await Process.run(
-        'sudo', ['systemctl', 'start', 'openauto.service']);
+        'sudo', ['systemctl', 'restart', 'openauto.service']);
     if (result.exitCode != 0) {
       if (kDebugMode) {
-        print('[ProjectionProvider] Display handover failed (${result.exitCode}): ${result.stderr}');
+        print('[ProjectionProvider] Background service launch failed (${result.exitCode}): ${result.stderr}');
       }
     }
   }
