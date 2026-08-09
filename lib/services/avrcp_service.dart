@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 
@@ -7,6 +8,7 @@ class AvrcpTrackInfo {
   final String title;
   final String artist;
   final String album;
+  final String coverUrl;
   final Duration duration;
   final Duration position;
   final bool isPlaying;
@@ -15,6 +17,7 @@ class AvrcpTrackInfo {
     required this.title,
     required this.artist,
     required this.album,
+    this.coverUrl = '',
     required this.duration,
     required this.position,
     required this.isPlaying,
@@ -24,9 +27,20 @@ class AvrcpTrackInfo {
     title: '',
     artist: '',
     album: '',
+    coverUrl: '',
     duration: Duration.zero,
     position: Duration.zero,
     isPlaying: false,
+  );
+
+  AvrcpTrackInfo withCover(String url) => AvrcpTrackInfo(
+    title: title,
+    artist: artist,
+    album: album,
+    coverUrl: url,
+    duration: duration,
+    position: position,
+    isPlaying: isPlaying,
   );
 
   bool get hasTrack => title.isNotEmpty || artist.isNotEmpty;
@@ -160,10 +174,49 @@ class AvrcpService {
         if (kDebugMode) {
           print('[AvrcpService] Track update: "${track.title}" by "${track.artist}" (${track.isPlaying ? "playing" : "paused"})');
         }
+
+        // Fetch album art in background — emit a second update with coverUrl once found.
+        if (track.hasTrack) {
+          _fetchCoverUrl(track.title, track.artist).then((coverUrl) {
+            if (coverUrl.isNotEmpty && _lastTrack == track) {
+              final withCover = track.withCover(coverUrl);
+              _lastTrack = withCover;
+              _trackController.add(withCover);
+              if (kDebugMode) print('[AvrcpService] Album art fetched: $coverUrl');
+            }
+          });
+        }
       }
     } catch (e) {
       if (kDebugMode) print('[AvrcpService] Poll error: $e');
     }
+  }
+
+  /// Fetches album art URL from iTunes Search API using track title + artist.
+  ///
+  /// Returns a 600×600 artwork URL, or empty string if not found.
+  /// Free to use, no API key required.
+  Future<String> _fetchCoverUrl(String title, String artist) async {
+    try {
+      final query = Uri.encodeComponent('$artist $title');
+      final uri = Uri.parse('https://itunes.apple.com/search?term=$query&entity=song&limit=1&media=music');
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 5);
+      final request = await client.getUrl(uri);
+      final response = await request.close();
+      if (response.statusCode != 200) return '';
+      final body = await response.transform(const Utf8Decoder()).join();
+      client.close();
+
+      // Parse artworkUrl100 and upgrade to 600×600
+      final artMatch = RegExp(r'"artworkUrl100"\s*:\s*"([^"]+)"').firstMatch(body);
+      if (artMatch != null) {
+        return artMatch.group(1)!.replaceAll('100x100bb', '600x600bb');
+      }
+    } catch (e) {
+      if (kDebugMode) print('[AvrcpService] Album art fetch error: $e');
+    }
+    return '';
   }
 
   /// Parse a string value from dbus-send --print-reply=literal Track dict output.

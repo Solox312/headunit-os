@@ -38,7 +38,7 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// Callback to notify MediaProvider of live AVRCP track updates.
   /// Set this from the app root after both providers are initialized.
-  void Function(String title, String artist, String album, Duration duration, bool isPlaying)? onTrackUpdate;
+  void Function(String title, String artist, String album, String coverUrl, Duration duration, bool isPlaying)? onTrackUpdate;
   void Function()? onDeviceDisconnected;
 
   Timer? _pollingTimer;
@@ -68,6 +68,7 @@ class BluetoothProvider extends ChangeNotifier {
           track.title,
           track.artist,
           track.album,
+          track.coverUrl,
           track.duration,
           track.isPlaying,
         );

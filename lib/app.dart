@@ -32,15 +32,13 @@ class RpiHeadunitApp extends StatelessWidget {
           create: (context) {
             final bt = BluetoothProvider();
             // Wire AVRCP track updates → MediaProvider so the Media tab shows live song info.
-            bt.onTrackUpdate = (title, artist, album, duration, isPlaying) {
+            bt.onTrackUpdate = (title, artist, album, coverUrl, duration, isPlaying) {
               final media = context.read<MediaProvider>();
-              // Directly update track info with bluetooth audio mode.
-              // Do NOT call setAudioMode first — it clears the media item and
-              // causes a flash to "No Audio Active" before updateTrackInfo fires.
               media.updateTrackInfo(
                 title: title.isNotEmpty ? title : 'Bluetooth Audio',
                 artist: artist.isNotEmpty ? artist : 'Connected Device',
                 album: album,
+                coverUrl: coverUrl,
                 duration: duration,
                 isPlaying: isPlaying,
                 source: 'Bluetooth Audio',
