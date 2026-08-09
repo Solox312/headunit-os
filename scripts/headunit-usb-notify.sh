@@ -38,7 +38,7 @@ EVENT="{\"action\":\"$ACTION\",\"vendor\":\"$VENDOR\",\"product\":\"$PRODUCT\"}"
 # kiosk user) plus the /tmp fallback used outside a systemd user session.
 # A missing socat binary or no listener yet are both non-fatal — udev must
 # never fail a rule over this.
-for sock in /run/user/*/headunit-os/usb-hotplug.sock /tmp/headunit-os/usb-hotplug.sock; do
+for sock in /run/user/*/headunit-os/usb-hotplug.sock /tmp/headunit-os/usb-hotplug.sock /tmp/flutter-pi-runtime/headunit-os/usb-hotplug.sock; do
   [[ -S "$sock" ]] || continue
   echo "$EVENT" | timeout 1 socat - "UNIX-CONNECT:$sock" 2>/dev/null || true
 done

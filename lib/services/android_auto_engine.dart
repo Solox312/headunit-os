@@ -16,6 +16,7 @@ class AndroidAutoEngine {
 
   bool get isSessionActive => _isSessionActive;
   bool get isSocketConnected => _aaSocket != null;
+  bool get isListening => _serverSocket != null;
   AAEngineState get state => _state;
 
   // Stream Controllers for H.264 Video, PCM Audio Channels, and Protocol Status

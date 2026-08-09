@@ -65,6 +65,29 @@ class WirelessAABridge {
 
   // ── Public API ───────────────────────────────────────────────────────────
 
+  /// Registers the AA Wireless SDP profile for the app's entire lifetime.
+  /// Called once at startup (ProjectionProvider constructor).
+  ///
+  /// This must NOT be scoped to the wizard session: phones read a Bluetooth
+  /// device's service list when they pair or reconnect and cache it. If the
+  /// profile only existed while the wizard was open, a phone that paired at
+  /// any other moment would permanently classify the head unit as
+  /// headphones and never initiate the Android Auto handshake.
+  Future<void> ensureHandoffDaemon() async {
+    if (Platform.isWindows || _handoffProcess != null) return;
+
+    // Surface the engine's socket-accept as the streaming step, for both
+    // wizard-initiated and phone-initiated sessions.
+    _engineStateSub ??= AndroidAutoEngine().stateStream.listen((state) {
+      if (state == AAEngineState.streamingActive && _isRunning) {
+        _emit(AAConnectionStep.streaming, 'Android Auto streaming',
+            data: {'deviceName': 'Android Phone'});
+      }
+    });
+
+    await _launchBtHandoffDaemon();
+  }
+
   /// Start the wireless Android Auto session.
   Future<void> startWirelessAndroidAuto() async {
     if (_isRunning) return;
@@ -77,14 +100,12 @@ class WirelessAABridge {
     }
   }
 
-  /// Stop the session and clean up hotspot + BT discoverability.
+  /// Stop the session and clean up hotspot + BT discoverability. The
+  /// handoff daemon deliberately stays alive — the SDP profile must remain
+  /// advertised so the phone can re-initiate later.
   Future<void> stopWirelessAndroidAuto() async {
     _isRunning = false;
 
-    _handoffProcess?.kill(ProcessSignal.sigterm);
-    _handoffProcess = null;
-    _engineStateSub?.cancel();
-    _engineStateSub = null;
     AndroidAutoEngine().stopSession();
 
     if (!Platform.isWindows) {
@@ -121,16 +142,6 @@ class WirelessAABridge {
         throw Exception('Could not bind Android Auto TCP port $_aaTcpPort');
       }
 
-      // The engine's socket accept is what actually marks the session live —
-      // surface that to the wizard as the streaming step.
-      _engineStateSub?.cancel();
-      _engineStateSub = AndroidAutoEngine().stateStream.listen((state) {
-        if (state == AAEngineState.streamingActive && _isRunning) {
-          _emit(AAConnectionStep.streaming, 'Android Auto streaming',
-              data: {'deviceName': 'Android Phone'});
-        }
-      });
-
       // Opportunistic wired path: if a phone is already plugged in over USB,
       // kick off the AOAP mode switch too.
       await AaUsbAoapService().checkForAndroidDeviceAndInitiateAoap();
@@ -141,13 +152,14 @@ class WirelessAABridge {
           data: {'btName': _bluetoothAlias});
       await _makeBluetoothDiscoverable();
 
-      // Step 4: Register the AA Wireless SDP profile + credential handshake
-      // daemon. Its stdout events drive the remaining wizard steps. Note:
-      // wireless AA has no user-visible app on the phone — pairing (or
-      // re-pairing) via Bluetooth is what triggers the phone to connect.
+      // Step 4: The handoff daemon (normally already running since app
+      // startup) advertises the SDP profile and performs the credential
+      // handshake. Its stdout events drive the remaining wizard steps.
+      // Note: wireless AA has no user-visible app on the phone — pairing
+      // (or re-pairing) via Bluetooth is what triggers the phone to connect.
       _emit(AAConnectionStep.waitingForPhone,
           'Pair your phone via Bluetooth: "$_bluetoothAlias" (re-pair if already paired)');
-      await _launchBtHandoffDaemon();
+      await ensureHandoffDaemon();
 
     } catch (e) {
       _emit(AAConnectionStep.error, 'Connection failed: $e');
@@ -198,9 +210,11 @@ class WirelessAABridge {
       if (kDebugMode) print('[AAHandoff][err] $line');
     });
 
-    // The daemon should outlive the whole session — an early exit while
-    // we're still running means registration or the runtime died.
+    // The daemon should live for the whole app run — clear the handle on
+    // exit so ensureHandoffDaemon() can respawn it, and surface the failure
+    // if a session was in flight.
     _handoffProcess!.exitCode.then((code) {
+      _handoffProcess = null;
       if (_isRunning && code != 0) {
         _emit(AAConnectionStep.error, 'Bluetooth handoff daemon exited (code $code)');
       }
@@ -213,6 +227,16 @@ class WirelessAABridge {
     final event = line.substring('EVENT:'.length);
 
     if (event.startsWith('PHONE_CONNECTED')) {
+      // The phone can initiate at any moment (e.g. right after pairing,
+      // with the wizard closed). Bring the hotspot and AA socket up before
+      // it acts on the credentials we're about to send it.
+      _isRunning = true;
+      if (!AndroidAutoEngine().isListening) {
+        AndroidAutoEngine().connectNativeSocket(port: _aaTcpPort);
+      }
+      _createHotspot().catchError((e) {
+        if (kDebugMode) print('[WirelessAABridge] Auto hotspot-up failed: $e');
+      });
       _emit(AAConnectionStep.tlsHandshake,
           'Phone connected — exchanging Wi-Fi credentials…');
     } else if (event.startsWith('CREDENTIALS_SENT')) {

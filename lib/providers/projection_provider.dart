@@ -14,6 +14,12 @@ class ProjectionProvider extends ChangeNotifier {
   ProjectionProvider() {
     UsbHotplugService().start();
     _usbHotplugSub = UsbHotplugService().events.listen(_onUsbHotplugEvent);
+
+    // Subscribe for the app's lifetime and keep the AA Wireless SDP profile
+    // advertised from startup — the phone may initiate the connection at any
+    // moment (e.g. right after pairing), not just while the wizard is open.
+    _aaEventSub = WirelessAABridge().events.listen(_onAAEvent);
+    WirelessAABridge().ensureHandoffDaemon();
   }
 
   ProjectionState get state => _state;
@@ -25,11 +31,10 @@ class ProjectionProvider extends ChangeNotifier {
 
   // ── Wireless Android Auto (no dongle) ────────────────────────────────────
 
-  /// Begins the Wireless Android Auto connection flow (Bluetooth → hotspot → OpenAuto).
+  /// Begins the Wireless Android Auto connection flow (hotspot → Bluetooth →
+  /// SDP handoff → native engine). Events arrive via the constructor's
+  /// lifetime subscription.
   Future<void> startWirelessAndroidAuto() async {
-    _aaEventSub?.cancel();
-    _aaEventSub = WirelessAABridge().events.listen(_onAAEvent);
-
     _state = _state.copyWith(
       mode: ProjectionMode.androidAuto,
       connectionType: ConnectionType.wireless,
@@ -42,11 +47,9 @@ class ProjectionProvider extends ChangeNotifier {
     await WirelessAABridge().startWirelessAndroidAuto();
   }
 
-  /// Tears down the active wireless session cleanly.
+  /// Tears down the active wireless session cleanly. The lifetime event
+  /// subscription stays — the phone can re-initiate later.
   Future<void> stopWirelessAndroidAuto() async {
-    _aaEventSub?.cancel();
-    _aaEventSub = null;
-
     await WirelessAABridge().stopWirelessAndroidAuto();
 
     _state = _state.copyWith(
@@ -65,7 +68,13 @@ class ProjectionProvider extends ChangeNotifier {
 
     switch (event.step) {
       case AAConnectionStep.streaming:
+        // The phone can initiate without the wizard being open — make sure
+        // the projection mode reflects the live session either way.
         _state = _state.copyWith(
+          mode: ProjectionMode.androidAuto,
+          connectionType: _state.connectionType == ConnectionType.none
+              ? ConnectionType.wireless
+              : _state.connectionType,
           isConnected: true,
           isStreaming: true,
           deviceName: event.data?['deviceName'] ?? 'Android Phone',
