@@ -38,6 +38,7 @@ if [[ ! -x "$AUTOAPP_BIN" ]]; then
 fi
 
 CURRENT_USER="${SUDO_USER:-$USER}"
+CURRENT_UID="$(id -u "$CURRENT_USER")"
 
 info "Step 1/3 — Installing openauto.service (display handover unit)..."
 sudo tee /etc/systemd/system/openauto.service > /dev/null << EOF
@@ -50,8 +51,18 @@ After=headunit.service
 
 [Service]
 Type=simple
-# Qt renders directly on KMS/GBM without a window system, same as flutter-pi.
+# Must run as the kiosk user, not root: autoapp's RtAudio output connects
+# to PulseAudio over the user's own session socket at
+# /run/user/<uid>/pulse/native. Running as root (systemd's default with no
+# User= set) has no route to that socket — pa_context_connect() fails, the
+# audio channel opens in a broken state, and that instability has been
+# observed dragging down the whole session (including the ping keepalive)
+# a few seconds later. Same DRM/KMS access as headunit.service, which
+# already renders successfully as this same non-root user.
+User=$CURRENT_USER
+Group=$CURRENT_USER
 Environment=QT_QPA_PLATFORM=eglfs
+Environment=XDG_RUNTIME_DIR=/run/user/$CURRENT_UID
 ExecStart=$AUTOAPP_BIN
 Restart=no
 ExecStopPost=/usr/bin/systemctl start headunit.service
