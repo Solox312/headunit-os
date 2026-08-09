@@ -15,15 +15,22 @@
 #    3. Calls org.bluez.Device1.ConnectProfile(AA_UUID) on the phone with
 #       retries — BlueZ performs SDP on the phone, finds ITS record, and
 #       opens the RFCOMM channel to it.
-#    4. Performs the Wi-Fi credential handshake over that link:
+#    4. Optionally exchanges WifiVersionRequest/WifiVersionResponse (some
+#       real head units do this before WifiStartRequest; skipped gracefully
+#       if the phone doesn't reply).
+#    5. Performs the Wi-Fi credential handshake over that link:
 #         HU  -> phone : WifiStartRequest  { ip_address, port }
 #         phone -> HU  : WifiInfoRequest
 #         HU  -> phone : WifiInfoResponse  { ssid, key, bssid, security, ap }
 #       after which the phone joins the hotspot and dials <ip>:<port>.
 #
-#  Wire format: big-endian u16 payload length, big-endian u16 message id,
-#  then a protobuf payload (hand-encoded — keeps the daemon dependency-free
-#  beyond python3-dbus/python3-gi, preinstalled on Mint/RPi OS desktop).
+#  Wire format, UUID, message IDs, and WifiInfoResponse field layout were
+#  cross-checked against the aa-proxy-rs project (github.com/aa-proxy/
+#  aa-proxy-rs, src/bluetooth.rs + src/protos/WifiInfoResponse.proto) to
+#  replace guesswork with a verified reference: 4-byte big-endian header
+#  (u16 length, u16 msg id), then a protobuf payload (hand-encoded here —
+#  keeps the daemon dependency-free beyond python3-dbus/python3-gi,
+#  preinstalled on Mint/RPi OS desktop).
 #
 #  Lifecycle events are printed to stdout as single "EVENT:..." lines for
 #  the Flutter app (WirelessAABridge) to parse. Runs until SIGTERM.
@@ -52,21 +59,28 @@ except ImportError as exc:
     emit(f"ERROR missing python dependency ({exc}) — run: sudo apt install python3-dbus python3-gi")
     sys.exit(1)
 
-# Older Gearhead builds host the wireless AA RFCOMM service on the classic
-# AAWireless UUID; newer builds moved to a Google vendor-specific UUID (seen
-# advertised by e.g. Pixel 8 Pro). Register and dial both, preferring
-# whichever the phone actually advertises.
-AA_WIRELESS_UUID_CLASSIC = "4de17a00-52cb-11e6-bdf4-0800200c9a66"
-AA_WIRELESS_UUID_VENDOR = "a3c87600-0005-1000-8000-001a11000100"
-AA_UUID_CANDIDATES = [AA_WIRELESS_UUID_VENDOR, AA_WIRELESS_UUID_CLASSIC]
+# Confirmed via aa-proxy-rs source — this is the only real AA Wireless RFCOMM
+# UUID. (An earlier revision of this daemon also tried a Google
+# vendor-specific UUID this phone advertises, a3c87600-0005-1000-8000-
+# 001a11000100 — btmon proved that's an ATT/GATT characteristic (L2CAP PSM
+# 31), not an RFCOMM byte-stream service, so it's been dropped entirely.)
+AA_WIRELESS_UUID = "4de17a00-52cb-11e6-bdf4-0800200c9a66"
+AA_UUID_CANDIDATES = [AA_WIRELESS_UUID]
 PROFILE_PATH = "/org/headunitos/aa_wireless"
 
-# Message ids on the RFCOMM handoff link
+# Message ids on the RFCOMM handoff link (aa-proxy-rs ProxyMessageId enum)
 MSG_WIFI_START_REQUEST = 1
 MSG_WIFI_INFO_REQUEST = 2
 MSG_WIFI_INFO_RESPONSE = 3
+MSG_WIFI_VERSION_REQUEST = 4
+MSG_WIFI_VERSION_RESPONSE = 5
 MSG_WIFI_CONNECT_STATUS = 6
 MSG_WIFI_START_RESPONSE = 7
+MSG_WIFI_PING_REQUEST = 8
+MSG_WIFI_PING_RESPONSE = 9
+MSG_WIFI_SETUP_INFO = 11
+
+VERSION_RESPONSE_WAIT_S = 4
 
 # WifiInfoResponse enums
 SECURITY_WPA2_PERSONAL = 8
@@ -108,6 +122,16 @@ def encode_wifi_start_request(ip_address, port):
     return _pb_string(1, ip_address) + _pb_uint(2, port)
 
 
+def encode_wifi_version_request(major=1, minor=1):
+    # Field numbers per the version-handshake fields aa-proxy-rs relays
+    # (major_version=1, minor_version=2). Exact version integers a real
+    # phone expects aren't published anywhere we could confirm — 1/1 is a
+    # conservative placeholder; the phone is expected to just echo back
+    # WifiVersionResponse regardless, since this is a capability probe, not
+    # a strict match requirement.
+    return _pb_uint(1, major) + _pb_uint(2, minor)
+
+
 def encode_wifi_info_response(ssid, psk, bssid):
     return (
         _pb_string(1, ssid)
@@ -121,11 +145,9 @@ def encode_wifi_info_response(ssid, psk, bssid):
 # ── Framed RFCOMM I/O over a raw fd ───────────────────────────────────────────
 #
 # The wire format below (2-byte length, 2-byte msg id, protobuf payload) is
-# the classic AAWireless-reverse-engineered protocol. It's unconfirmed for
-# the newer Google vendor-specific service UUID some phones now host this
-# handshake on — so every raw read is hex-dumped as RX_RAW before we try to
-# interpret it as a frame, giving a ground-truth trace to diagnose a framing
-# mismatch instead of hanging silently.
+# cross-checked against aa-proxy-rs's src/bluetooth.rs. Every raw read is
+# still hex-dumped as RX_RAW before we try to interpret it as a frame, so a
+# real trace exists if something still doesn't line up.
 
 SELECT_POLL_S = 5
 HEARTBEAT_EVERY_S = 15
@@ -173,6 +195,14 @@ class RawReader:
         del self._buf[:count]
         return data
 
+    def data_ready_within(self, timeout_s):
+        """Non-consuming poll — used to bound how long we wait for an
+        optional reply (e.g. WifiVersionResponse) before moving on."""
+        if self._buf:
+            return True
+        ready, _, _ = select.select([self._fd], [], [], timeout_s)
+        return bool(ready)
+
 
 def read_frame(reader):
     header = reader.read_exact(4)
@@ -204,11 +234,30 @@ def detect_bssid(explicit):
 
 def handle_connection(fd, config, device_path):
     try:
+        reader = RawReader(fd)
+
+        # Optional version handshake — some real head units send this before
+        # WifiStartRequest. Not confirmed required for every phone, so we
+        # bound the wait and proceed regardless rather than risk hanging on
+        # a phone that doesn't expect it.
+        write_frame(fd, MSG_WIFI_VERSION_REQUEST, encode_wifi_version_request())
+        emit("WIFI_VERSION_REQUEST_SENT")
+        if reader.data_ready_within(VERSION_RESPONSE_WAIT_S):
+            msg_id, payload = read_frame(reader)
+            if msg_id is None:
+                emit("PHONE_DISCONNECTED")
+                return
+            if msg_id == MSG_WIFI_VERSION_RESPONSE:
+                emit(f"WIFI_VERSION_RESPONSE len={len(payload)}")
+            else:
+                emit(f"UNEXPECTED_AFTER_VERSION_REQUEST id={msg_id} len={len(payload)}")
+        else:
+            emit("WIFI_VERSION_RESPONSE_TIMEOUT proceeding without it")
+
         write_frame(fd, MSG_WIFI_START_REQUEST,
                     encode_wifi_start_request(config.ip, config.port))
         emit(f"WIFI_START_SENT ip={config.ip} port={config.port}")
 
-        reader = RawReader(fd)
         while True:
             msg_id, payload = read_frame(reader)
             if msg_id is None:
@@ -224,6 +273,11 @@ def handle_connection(fd, config, device_path):
                 emit("WIFI_START_RESPONSE")
             elif msg_id == MSG_WIFI_CONNECT_STATUS:
                 emit(f"WIFI_CONNECT_STATUS len={len(payload)}")
+            elif msg_id == MSG_WIFI_PING_REQUEST:
+                write_frame(fd, MSG_WIFI_PING_RESPONSE, b"")
+                emit("PING_REPLIED")
+            elif msg_id == MSG_WIFI_SETUP_INFO:
+                emit(f"WIFI_SETUP_INFO len={len(payload)}")
             else:
                 emit(f"UNKNOWN_MESSAGE id={msg_id} len={len(payload)}")
     except OSError as exc:
