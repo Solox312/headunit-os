@@ -65,7 +65,7 @@ Environment=QT_QPA_PLATFORM=eglfs
 Environment=XDG_RUNTIME_DIR=/run/user/$CURRENT_UID
 ExecStart=$AUTOAPP_BIN
 Restart=no
-ExecStopPost=/usr/bin/systemctl start headunit.service
+ExecStopPost=/usr/bin/systemctl --no-block start headunit.service
 
 [Install]
 # Intentionally not enabled at boot — started on demand by the app (USB
