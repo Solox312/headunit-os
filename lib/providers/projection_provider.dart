@@ -11,6 +11,7 @@ class ProjectionProvider extends ChangeNotifier {
   ProjectionState _state = const ProjectionState();
   StreamSubscription<AAConnectionEvent>? _aaEventSub;
   StreamSubscription<UsbHotplugEvent>? _usbHotplugSub;
+  Timer? _usbPollTimer;
   bool _isUsbConnected = false;
 
   bool get isUsbConnected => _isUsbConnected;
@@ -19,6 +20,11 @@ class ProjectionProvider extends ChangeNotifier {
     UsbHotplugService().start();
     _usbHotplugSub = UsbHotplugService().events.listen(_onUsbHotplugEvent);
     checkInitialUsbState();
+
+    // Poll sysfs every 1.5 seconds for instant USB plug/unplug UI updates
+    _usbPollTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+      checkInitialUsbState();
+    });
 
     // Subscribe for the app's lifetime and keep the AA Wireless SDP profile
     // advertised from startup — the phone may initiate the connection at any
@@ -30,19 +36,37 @@ class ProjectionProvider extends ChangeNotifier {
   Future<void> checkInitialUsbState() async {
     if (!Platform.isLinux) return;
     try {
-      final res = await Process.run('lsusb', []);
-      if (res.exitCode == 0) {
-        final stdout = res.stdout as String;
-        final hasPhone = stdout.contains('18d1:') ||
-            stdout.contains('04e8:') ||
-            stdout.contains('22b8:') ||
-            stdout.contains('0bb4:') ||
-            stdout.contains('2717:') ||
-            stdout.contains('05ac:');
-        _isUsbConnected = hasPhone;
-        notifyListeners();
+      final sysDir = Directory('/sys/bus/usb/devices');
+      if (await sysDir.exists()) {
+        final entities = await sysDir.list().toList();
+        bool foundPhone = false;
+        for (final entity in entities) {
+          final vendorFile = File('${entity.path}/idVendor');
+          if (await vendorFile.exists()) {
+            final vendor = (await vendorFile.readAsString()).trim();
+            // Vendor IDs for mobile devices & AA/CarPlay accessories:
+            // 18d1 = Google (Pixel/Nexus/AOAP)
+            // 04e8 = Samsung
+            // 22b8 = Motorola
+            // 0bb4 = HTC
+            // 2717 = Xiaomi
+            // 1004 = LG
+            // 05c6 = Qualcomm
+            // 05ac = Apple iPhone / CarPlay dongles
+            if (const ['18d1', '04e8', '22b8', '0bb4', '2717', '1004', '05c6', '05ac'].contains(vendor)) {
+              foundPhone = true;
+              break;
+            }
+          }
+        }
+        if (_isUsbConnected != foundPhone) {
+          _isUsbConnected = foundPhone;
+          notifyListeners();
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) print('[ProjectionProvider] Error reading sysfs USB devices: $e');
+    }
   }
 
   ProjectionState get state => _state;
@@ -253,6 +277,7 @@ class ProjectionProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _usbPollTimer?.cancel();
     _aaEventSub?.cancel();
     _usbHotplugSub?.cancel();
     super.dispose();
