@@ -176,6 +176,8 @@ class AndroidAutoEngine {
 
   /// Terminate Session
   void stopSession() {
+    _serverSocket?.close();
+    _serverSocket = null;
     _aaSocket?.destroy();
     _aaSocket = null;
     _isSessionActive = false;

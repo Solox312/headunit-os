@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '../models/aa_protocol_types.dart';
 import '../models/projection_state.dart';
 import 'aa_usb_aoap_service.dart';
 import 'android_auto_engine.dart';
@@ -22,9 +23,16 @@ class AAConnectionEvent {
 ///
 /// On Linux/RPi:
 ///   1. Creates a Wi-Fi hotspot via nmcli (HeadUnit-OS SSID)
-///   2. Makes the device Bluetooth-discoverable as "HeadUnit-OS" via bluetoothctl
-///   3. Runs the Native Android Auto Protocol Engine (AOA 2.0 + TCP Demuxer)
-///   4. Emits AAConnectionEvent stream for the Flutter UI
+///   2. Binds the native AA protocol socket (port 50001) so it's listening
+///      before the phone is told where to dial in
+///   3. Makes the device Bluetooth-discoverable as "HeadUnit-OS"
+///   4. Spawns scripts/aa_wireless_handoff.py, which registers the Android
+///      Auto Wireless RFCOMM profile with BlueZ and performs the Wi-Fi
+///      credential handshake when the phone connects — without that SDP
+///      record the phone treats us as plain headphones and never initiates
+///      projection
+///   5. Emits AAConnectionEvent stream for the Flutter UI, driven by the
+///      handoff daemon's stdout events and the engine's socket state
 ///
 /// On Windows (development simulation):
 ///   - Replays the same lifecycle events with artificial delays so the
@@ -34,7 +42,8 @@ class WirelessAABridge {
   factory WirelessAABridge() => _instance;
   WirelessAABridge._internal();
 
-  Process? _openAutoProcess;
+  Process? _handoffProcess;
+  StreamSubscription<AAEngineState>? _engineStateSub;
   bool _isRunning = false;
 
   final StreamController<AAConnectionEvent> _eventController =
@@ -48,6 +57,11 @@ class WirelessAABridge {
   static const String _hotspotSsid = 'HeadUnit-OS';
   static const String _hotspotPassword = 'headunit2024';
   static const String _bluetoothAlias = 'HeadUnit-OS';
+
+  /// Head unit's own IP on the hotspot subnet — nmcli ipv4.method=shared
+  /// always assigns 10.42.0.1 to the AP interface.
+  static const String _hotspotIp = '10.42.0.1';
+  static const int _aaTcpPort = 50001;
 
   // ── Public API ───────────────────────────────────────────────────────────
 
@@ -67,12 +81,15 @@ class WirelessAABridge {
   Future<void> stopWirelessAndroidAuto() async {
     _isRunning = false;
 
-    _openAutoProcess?.kill(ProcessSignal.sigterm);
-    _openAutoProcess = null;
+    _handoffProcess?.kill(ProcessSignal.sigterm);
+    _handoffProcess = null;
+    _engineStateSub?.cancel();
+    _engineStateSub = null;
+    AndroidAutoEngine().stopSession();
 
     if (!Platform.isWindows) {
       try {
-        await Process.run('nmcli', ['connection', 'down', _hotspotConnectionName]);
+        await Process.run('sudo', ['nmcli', 'connection', 'down', _hotspotConnectionName]);
         await Process.run('bluetoothctl', ['discoverable', 'off']);
         await Process.run('bluetoothctl', ['pairable', 'off']);
       } catch (e) {
@@ -83,16 +100,10 @@ class WirelessAABridge {
     _emit(AAConnectionStep.idle, 'Disconnected');
   }
 
-  /// Forward a touch input event to the OpenAuto process via stdin protocol.
+  /// Forward a touch input event to the native AA engine (Channel 4).
   void sendTouchEvent(double normalizedX, double normalizedY, int action) {
     // action: 0=DOWN, 1=MOVE, 2=UP
-    if (_openAutoProcess != null) {
-      // OpenAuto reads touch events from stdin as: ACTION,X,Y\n
-      _openAutoProcess!.stdin.writeln('$action,${(normalizedX * 10000).toInt()},${(normalizedY * 10000).toInt()}');
-    }
-    if (kDebugMode) {
-      print('[WirelessAABridge] Touch → (${(normalizedX * 100).toStringAsFixed(1)}%, ${(normalizedY * 100).toStringAsFixed(1)}%) action=$action');
-    }
+    AndroidAutoEngine().sendTouchEvent(x: normalizedX, y: normalizedY, action: action);
   }
 
   // ── Linux native flow ────────────────────────────────────────────────────
@@ -103,21 +114,116 @@ class WirelessAABridge {
       _emit(AAConnectionStep.hotspotCreating, 'Creating Wi-Fi hotspot…');
       await _createHotspot();
 
-      // Step 2: Bluetooth discoverable
+      // Step 2: Bind the native protocol socket up front, so the port is
+      // already listening by the time the phone is handed the credentials.
+      final bound = await AndroidAutoEngine().connectNativeSocket(port: _aaTcpPort);
+      if (!bound) {
+        throw Exception('Could not bind Android Auto TCP port $_aaTcpPort');
+      }
+
+      // The engine's socket accept is what actually marks the session live —
+      // surface that to the wizard as the streaming step.
+      _engineStateSub?.cancel();
+      _engineStateSub = AndroidAutoEngine().stateStream.listen((state) {
+        if (state == AAEngineState.streamingActive && _isRunning) {
+          _emit(AAConnectionStep.streaming, 'Android Auto streaming',
+              data: {'deviceName': 'Android Phone'});
+        }
+      });
+
+      // Opportunistic wired path: if a phone is already plugged in over USB,
+      // kick off the AOAP mode switch too.
+      await AaUsbAoapService().checkForAndroidDeviceAndInitiateAoap();
+
+      // Step 3: Bluetooth discoverable
       _emit(AAConnectionStep.bluetoothDiscoverable,
           'Waiting for Bluetooth pairing…',
           data: {'btName': _bluetoothAlias});
       await _makeBluetoothDiscoverable();
 
-      // Step 3: Check USB AOA Mode or start Native Wi-Fi Socket Engine
+      // Step 4: Register the AA Wireless SDP profile + credential handshake
+      // daemon. Its stdout events drive the remaining wizard steps.
       _emit(AAConnectionStep.waitingForPhone,
           'Open Android Auto on your phone');
-      await _launchNativeAaEngine();
+      await _launchBtHandoffDaemon();
 
     } catch (e) {
       _emit(AAConnectionStep.error, 'Connection failed: $e');
       _isRunning = false;
       if (kDebugMode) print('[WirelessAABridge] Fatal error: $e');
+    }
+  }
+
+  /// Locates the handoff daemon script — repo-relative when running via
+  /// `flutter run` from the project root, /usr/local/bin when installed as a
+  /// kiosk appliance.
+  String? _resolveHandoffScriptPath() {
+    const candidates = [
+      'scripts/aa_wireless_handoff.py',
+      '/usr/local/bin/aa_wireless_handoff.py',
+    ];
+    for (final path in candidates) {
+      if (File(path).existsSync()) return path;
+    }
+    return null;
+  }
+
+  Future<void> _launchBtHandoffDaemon() async {
+    final scriptPath = _resolveHandoffScriptPath();
+    if (scriptPath == null) {
+      _emit(AAConnectionStep.error,
+          'aa_wireless_handoff.py not found — run from the repo root or install it to /usr/local/bin');
+      _isRunning = false;
+      return;
+    }
+
+    _handoffProcess = await Process.start('python3', [
+      scriptPath,
+      '--ssid', _hotspotSsid,
+      '--psk', _hotspotPassword,
+      '--ip', _hotspotIp,
+      '--port', '$_aaTcpPort',
+    ]);
+
+    _handoffProcess!.stdout.transform(const SystemEncoding().decoder).listen((chunk) {
+      for (final line in chunk.split('\n')) {
+        final trimmed = line.trim();
+        if (trimmed.isNotEmpty) _handleHandoffLine(trimmed);
+      }
+    });
+
+    _handoffProcess!.stderr.transform(const SystemEncoding().decoder).listen((line) {
+      if (kDebugMode) print('[AAHandoff][err] $line');
+    });
+
+    // The daemon should outlive the whole session — an early exit while
+    // we're still running means registration or the runtime died.
+    _handoffProcess!.exitCode.then((code) {
+      if (_isRunning && code != 0) {
+        _emit(AAConnectionStep.error, 'Bluetooth handoff daemon exited (code $code)');
+      }
+    });
+  }
+
+  void _handleHandoffLine(String line) {
+    if (kDebugMode) print('[AAHandoff] $line');
+    if (!line.startsWith('EVENT:')) return;
+    final event = line.substring('EVENT:'.length);
+
+    if (event.startsWith('PHONE_CONNECTED')) {
+      _emit(AAConnectionStep.tlsHandshake,
+          'Phone connected — exchanging Wi-Fi credentials…');
+    } else if (event.startsWith('CREDENTIALS_SENT')) {
+      _emit(AAConnectionStep.channelDiscovery,
+          'Phone joining hotspot & opening projection stream…');
+    } else if (event.startsWith('PHONE_DISCONNECTED')) {
+      // BT link dropping is normal once projection is streaming over Wi-Fi;
+      // only treat it as a setback if the TCP session isn't up yet.
+      if (!AndroidAutoEngine().isSessionActive) {
+        _emit(AAConnectionStep.waitingForPhone, 'Open Android Auto on your phone');
+      }
+    } else if (event.startsWith('ERROR')) {
+      _emit(AAConnectionStep.error, event.substring('ERROR'.length).trim());
     }
   }
 
@@ -159,25 +265,6 @@ class WirelessAABridge {
     await Process.run('bluetoothctl', ['pairable', 'on']);
     if (kDebugMode) {
       print('[WirelessAABridge] Bluetooth discoverable as: $_bluetoothAlias');
-    }
-  }
-
-  Future<void> _launchNativeAaEngine() async {
-    _emit(AAConnectionStep.tlsHandshake, 'Securing connection via Native AA Engine…');
-    
-    // Check USB AOA Mode
-    await AaUsbAoapService().checkForAndroidDeviceAndInitiateAoap();
-
-    // Connect Native Protocol Socket
-    _emit(AAConnectionStep.channelDiscovery, 'Negotiating video & audio channels…');
-    final connected = await AndroidAutoEngine().connectNativeSocket(port: 50001);
-
-    if (connected) {
-      _emit(AAConnectionStep.streaming, 'Android Auto streaming',
-          data: {'deviceName': 'Android Phone', 'phoneBattery': 85});
-    } else {
-      _emit(AAConnectionStep.error, 'Could not connect to Android Auto stream');
-      _isRunning = false;
     }
   }
 
