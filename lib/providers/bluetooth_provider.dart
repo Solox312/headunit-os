@@ -237,7 +237,7 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// Send AVRCP play/pause toggle to the connected device.
   Future<void> avrcpTogglePlayPause(bool isCurrentlyPlaying) async {
-    final mac = connectedDevice?.macAddress;
+    final mac = connectedDevice?.macAddress ?? _lastConnectedMac;
     if (mac == null) return;
     if (isCurrentlyPlaying) {
       await _avrcp.sendPause(mac);
@@ -248,13 +248,13 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// Send AVRCP next track to the connected device.
   Future<void> avrcpNext() async {
-    final mac = connectedDevice?.macAddress;
+    final mac = connectedDevice?.macAddress ?? _lastConnectedMac;
     if (mac != null) await _avrcp.sendNext(mac);
   }
 
   /// Send AVRCP previous track to the connected device.
   Future<void> avrcpPrevious() async {
-    final mac = connectedDevice?.macAddress;
+    final mac = connectedDevice?.macAddress ?? _lastConnectedMac;
     if (mac != null) await _avrcp.sendPrevious(mac);
   }
 }

@@ -31,9 +31,10 @@ class RpiHeadunitApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (context) {
             final bt = BluetoothProvider();
+            final media = context.read<MediaProvider>();
+
             // Wire AVRCP track updates → MediaProvider so the Media tab shows live song info.
             bt.onTrackUpdate = (title, artist, album, coverUrl, duration, isPlaying) {
-              final media = context.read<MediaProvider>();
               media.updateTrackInfo(
                 title: title.isNotEmpty ? title : 'Bluetooth Audio',
                 artist: artist.isNotEmpty ? artist : 'Connected Device',
@@ -46,9 +47,26 @@ class RpiHeadunitApp extends StatelessWidget {
               );
             };
             bt.onDeviceDisconnected = () {
-              final media = context.read<MediaProvider>();
               media.clearMedia();
             };
+
+            // Wire UI media controls → Bluetooth AVRCP commands.
+            media.onTogglePlayPause = () {
+              if (media.currentMode == AudioSourceMode.bluetooth) {
+                bt.avrcpTogglePlayPause(media.mediaItem.isPlaying);
+              }
+            };
+            media.onNextTrack = () {
+              if (media.currentMode == AudioSourceMode.bluetooth) {
+                bt.avrcpNext();
+              }
+            };
+            media.onPreviousTrack = () {
+              if (media.currentMode == AudioSourceMode.bluetooth) {
+                bt.avrcpPrevious();
+              }
+            };
+
             return bt;
           },
           lazy: false,

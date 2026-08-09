@@ -76,20 +76,25 @@ class MediaProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void Function()? onTogglePlayPause;
+  void Function()? onNextTrack;
+  void Function()? onPreviousTrack;
+
   void togglePlayPause() {
     if (!_mediaItem.hasMedia) return;
     _mediaItem = _mediaItem.copyWith(isPlaying: !_mediaItem.isPlaying);
     notifyListeners();
+    onTogglePlayPause?.call();
   }
 
   void nextTrack() {
     if (!_mediaItem.hasMedia) return;
-    // Skip to next track command sent to Bluetooth / Projection receiver
+    onNextTrack?.call();
   }
 
   void previousTrack() {
     if (!_mediaItem.hasMedia) return;
-    // Skip to previous track command sent to Bluetooth / Projection receiver
+    onPreviousTrack?.call();
   }
 
   void seek(Duration newPosition) {
