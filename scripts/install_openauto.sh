@@ -149,9 +149,12 @@ make -j"$(nproc)"
 # wrong for this checkout.
 if ! sudo make install 2>/dev/null; then
   warn "openauto has no 'make install' target — locating the built autoapp binary manually."
-  AUTOAPP_BIN=$(find . -maxdepth 4 -type f -name autoapp -perm -u+x | head -1)
+  # openauto's CMakeLists.txt sets RUNTIME_OUTPUT_DIRECTORY to the source
+  # tree's own bin/, a sibling of build/ — not inside it. Search the whole
+  # openauto checkout (..), not just the build directory.
+  AUTOAPP_BIN=$(find .. -maxdepth 4 -type f -name autoapp -perm -u+x | head -1)
   if [[ -z "$AUTOAPP_BIN" ]]; then
-    error "Could not locate a built 'autoapp' binary under $(pwd). Check the build output above for errors."
+    error "Could not locate a built 'autoapp' binary under $(cd .. && pwd). Check the build output above for errors."
   fi
   sudo install -d "$INSTALL_PREFIX/bin"
   sudo install -m 755 "$AUTOAPP_BIN" "$INSTALL_PREFIX/bin/autoapp"
