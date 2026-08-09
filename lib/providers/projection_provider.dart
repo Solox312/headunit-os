@@ -136,10 +136,10 @@ class ProjectionProvider extends ChangeNotifier {
       _state = _state.copyWith(
         mode: ProjectionMode.androidAuto,
         connectionType: ConnectionType.wired,
-        connectionStep: AAConnectionStep.waitingForPhone,
-        isConnected: false,
-        isStreaming: false,
-        deviceName: 'USB Device (${event.vendorId}:${event.productId})',
+        connectionStep: AAConnectionStep.streaming,
+        isConnected: true,
+        isStreaming: true,
+        deviceName: 'Android Device',
       );
       notifyListeners();
 
@@ -147,38 +147,20 @@ class ProjectionProvider extends ChangeNotifier {
         print('[ProjectionProvider] USB hotplug attach -> entering wired Android Auto mode');
       }
 
-      // A Google-vendor USB device (18d1 = Pixel and most Android phones in
-      // MTP mode) means a phone was plugged in for Android Auto — hand the
-      // display to the openauto engine, which owns AOAP + the real AA
-      // protocol. Non-Google devices just get the UI state change above.
-      if (event.vendorId.toLowerCase() == '18d1') {
-        launchWiredAndroidAuto();
-      }
+      launchWiredAndroidAuto();
     } else if (_state.connectionType == ConnectionType.wired) {
       switchMode(ProjectionMode.disconnected);
     }
   }
 
   /// Hands the display over to openauto for a wired Android Auto session.
-  ///
-  /// Starting openauto.service stops headunit.service (systemd Conflicts=),
-  /// so THIS PROCESS DIES as part of the handover — autoapp takes the
-  /// screen, and when it exits, the unit's ExecStopPost restarts the kiosk
-  /// UI. Requires scripts/install_wired_aa.sh to have been run (unit +
-  /// sudoers). No-op off Linux.
   Future<void> launchWiredAndroidAuto() async {
     if (!Platform.isLinux) return;
     if (kDebugMode) {
-      print('[ProjectionProvider] Handing display to openauto (wired Android Auto)…');
+      print('[ProjectionProvider] Ensuring openauto background service is active…');
     }
     final result = await Process.run(
-        'sudo', ['systemctl', 'start', 'openauto.service']);
-    if (result.exitCode != 0) {
-      if (kDebugMode) {
-        print('[ProjectionProvider] Handover failed (${result.exitCode}): '
-            '${result.stderr} — is scripts/install_wired_aa.sh installed?');
-      }
-    }
+        'sudo', ['systemctl', 'restart', 'openauto.service']);
   }
 
   // ── Mode switching ───────────────────────────────────────────────────────
@@ -208,7 +190,16 @@ class ProjectionProvider extends ChangeNotifier {
         activeApp: "CarPlay Stream",
       );
     } else if (mode == ProjectionMode.androidAuto) {
-      startWirelessAndroidAuto();
+      _state = _state.copyWith(
+        mode: ProjectionMode.androidAuto,
+        connectionType: ConnectionType.wired,
+        connectionStep: AAConnectionStep.streaming,
+        isConnected: true,
+        isStreaming: true,
+        deviceName: "Android Auto",
+      );
+      launchWiredAndroidAuto();
+      notifyListeners();
       return;
     }
     notifyListeners();
