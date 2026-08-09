@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/bluetooth_device.dart';
 import '../services/bluetooth_service.dart';
@@ -82,13 +83,16 @@ class BluetoothProvider extends ChangeNotifier {
       if (_isBluetoothEnabled && !_isScanning && !_isConnecting) {
         await refreshPairedDevices();
 
-        // Start or stop AVRCP polling based on connection state
-        final connected = connectedDevice;
-        if (connected != null && connected.macAddress != _lastConnectedMac) {
-          _lastConnectedMac = connected.macAddress;
-          _avrcp.startPolling(connected.macAddress);
-          if (kDebugMode) print('[BluetoothProvider] AVRCP polling started for ${connected.name}');
-        } else if (connected == null && _lastConnectedMac != null) {
+        // Query connected devices directly via bluetoothctl — more reliable than
+        // checking connectedDevice from the paired list, which may be empty if
+        // the device connected without going through the formal pair flow.
+        final connectedMac = await _getDirectlyConnectedMac();
+
+        if (connectedMac != null && connectedMac != _lastConnectedMac) {
+          _lastConnectedMac = connectedMac;
+          _avrcp.startPolling(connectedMac);
+          if (kDebugMode) print('[BluetoothProvider] AVRCP polling started for $connectedMac');
+        } else if (connectedMac == null && _lastConnectedMac != null) {
           _lastConnectedMac = null;
           _avrcp.stopPolling();
           onDeviceDisconnected?.call();
@@ -96,6 +100,24 @@ class BluetoothProvider extends ChangeNotifier {
         }
       }
     });
+  }
+
+  /// Queries BlueZ directly for any currently connected device MAC address.
+  Future<String?> _getDirectlyConnectedMac() async {
+    try {
+      final result = await Process.run('bluetoothctl', ['devices', 'Connected']);
+      if (result.exitCode != 0) return null;
+      final lines = result.stdout.toString().split('\n');
+      for (final line in lines) {
+        if (line.trim().startsWith('Device')) {
+          final parts = line.trim().split(' ');
+          if (parts.length >= 2) return parts[1];
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('[BluetoothProvider] _getDirectlyConnectedMac error: $e');
+    }
+    return null;
   }
 
   @override
