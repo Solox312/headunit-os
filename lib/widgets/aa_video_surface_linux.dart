@@ -13,7 +13,12 @@ class _LinuxVideoSurfaceState extends State<_LinuxVideoSurface> {
   void initState() {
     super.initState();
     _player = Player();
-    _controller = VideoController(_player);
+    _controller = VideoController(
+      _player,
+      configuration: const VideoControllerConfiguration(
+        enableHardwareAcceleration: false,
+      ),
+    );
 
     // OpenAuto outputs H.264 over UDP — libmpv opens it as a live stream.
     _player.open(Media('udp://127.0.0.1:5556'), play: true);
