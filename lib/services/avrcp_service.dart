@@ -167,18 +167,24 @@ class AvrcpService {
   }
 
   /// Parse a string value from dbus-send --print-reply=literal Track dict output.
-  /// Example line: `   "Title" variant             string "Song Name"`
+  ///
+  /// Actual format returned by BlueZ:
+  ///   dict entry(
+  ///      Title            variant                Up         )
+  ///
+  /// Values are plain unquoted text after 'variant', not wrapped in string"..."
   String _parseStringValue(String output, String key) {
     final lines = output.split('\n');
-    for (int i = 0; i < lines.length; i++) {
-      if (lines[i].contains('"$key"') && i + 1 < lines.length) {
-        final valueLine = lines[i + 1];
-        final match = RegExp(r'string\s+"([^"]*)"').firstMatch(valueLine);
-        if (match != null) return match.group(1) ?? '';
+    for (final line in lines) {
+      // Match lines containing the key and 'variant' (same-line format used by BlueZ)
+      if (line.contains(key) && line.contains('variant')) {
+        final afterVariant = line.split('variant').last;
+        final value = afterVariant.replaceAll(')', '').trim();
+        // Skip uint32 values and empty values
+        if (value.isNotEmpty && !value.startsWith('uint32') && !value.startsWith('/')) {
+          return value;
+        }
       }
-      // Also try same-line format
-      final sameLineMatch = RegExp('"$key".*string\\s+"([^"]*)"').firstMatch(lines[i]);
-      if (sameLineMatch != null) return sameLineMatch.group(1) ?? '';
     }
     return '';
   }
@@ -186,10 +192,9 @@ class AvrcpService {
   /// Parse duration value (uint32 milliseconds) from Track dict.
   int _parseDurationMs(String output, String key) {
     final lines = output.split('\n');
-    for (int i = 0; i < lines.length; i++) {
-      if (lines[i].contains('"$key"')) {
-        final search = i + 1 < lines.length ? lines[i] + lines[i + 1] : lines[i];
-        final match = RegExp(r'uint32\s+(\d+)').firstMatch(search);
+    for (final line in lines) {
+      if (line.contains(key) && line.contains('uint32')) {
+        final match = RegExp(r'uint32\s+(\d+)').firstMatch(line);
         if (match != null) return int.tryParse(match.group(1) ?? '0') ?? 0;
       }
     }

@@ -53,6 +53,7 @@ class MediaProvider extends ChangeNotifier {
     Duration duration = Duration.zero,
     String source = 'Connected Device',
     bool isPlaying = true,
+    AudioSourceMode? audioMode,
   }) {
     _mediaItem = MediaItem(
       hasMedia: true,
@@ -65,7 +66,7 @@ class MediaProvider extends ChangeNotifier {
       isPlaying: isPlaying,
       volume: _mediaItem.volume,
       source: source,
-      audioMode: _mediaItem.audioMode,
+      audioMode: audioMode ?? _mediaItem.audioMode,
     );
     notifyListeners();
   }
