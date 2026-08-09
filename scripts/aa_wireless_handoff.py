@@ -49,6 +49,13 @@ except ImportError as exc:
 AA_WIRELESS_UUID = "4de17a00-52cb-11e6-bdf4-0800200c9a66"
 PROFILE_PATH = "/org/headunitos/aa_wireless"
 
+# Android Auto only offers the wireless handshake to devices it classifies as
+# car/headset units, which requires an audio profile in the SDP record.
+# Reference implementations (WirelessAndroidAutoDongle, aa-proxy-rs) register
+# a stub HSP Headset profile alongside the AA UUID for exactly this reason.
+HSP_HS_UUID = "00001108-0000-1000-8000-00805f9b34fb"
+HSP_PROFILE_PATH = "/org/headunitos/hsp_stub"
+
 # Message ids on the RFCOMM handoff link
 MSG_WIFI_START_REQUEST = 1
 MSG_WIFI_INFO_REQUEST = 2
@@ -201,6 +208,23 @@ class AAWirelessProfile(dbus.service.Object):
         emit("PROFILE_RELEASED")
 
 
+class StubAudioProfile(dbus.service.Object):
+    """Parks incoming HSP connections — exists only so the SDP record makes
+    the phone classify us as a car unit (see HSP_HS_UUID note above)."""
+
+    @dbus.service.method("org.bluez.Profile1", in_signature="oha{sv}", out_signature="")
+    def NewConnection(self, device, fd, fd_properties):
+        os.close(fd.take())
+
+    @dbus.service.method("org.bluez.Profile1", in_signature="o", out_signature="")
+    def RequestDisconnection(self, device):
+        pass
+
+    @dbus.service.method("org.bluez.Profile1", in_signature="", out_signature="")
+    def Release(self):
+        pass
+
+
 def main():
     parser = argparse.ArgumentParser(description="Wireless Android Auto BT handoff daemon")
     parser.add_argument("--ssid", required=True)
@@ -232,6 +256,22 @@ def main():
         sys.exit(1)
 
     emit(f"PROFILE_REGISTERED uuid={AA_WIRELESS_UUID} channel={config.channel}")
+
+    # Best-effort: PulseAudio/PipeWire may already advertise HSP/HFP, in
+    # which case BlueZ rejects this as a duplicate — that's fine, the phone
+    # just needs *some* audio profile present.
+    try:
+        StubAudioProfile(bus, HSP_PROFILE_PATH)
+        manager.RegisterProfile(HSP_PROFILE_PATH, HSP_HS_UUID, {
+            "Name": "HeadUnit HSP",
+            "Role": "server",
+            "Channel": dbus.UInt16(6),
+            "RequireAuthentication": dbus.Boolean(False),
+            "RequireAuthorization": dbus.Boolean(False),
+        })
+        emit("HSP_STUB_REGISTERED")
+    except dbus.exceptions.DBusException as exc:
+        emit(f"HSP_STUB_SKIPPED {exc}")
 
     loop = GLib.MainLoop()
     try:

@@ -142,9 +142,11 @@ class WirelessAABridge {
       await _makeBluetoothDiscoverable();
 
       // Step 4: Register the AA Wireless SDP profile + credential handshake
-      // daemon. Its stdout events drive the remaining wizard steps.
+      // daemon. Its stdout events drive the remaining wizard steps. Note:
+      // wireless AA has no user-visible app on the phone — pairing (or
+      // re-pairing) via Bluetooth is what triggers the phone to connect.
       _emit(AAConnectionStep.waitingForPhone,
-          'Open Android Auto on your phone');
+          'Pair your phone via Bluetooth: "$_bluetoothAlias" (re-pair if already paired)');
       await _launchBtHandoffDaemon();
 
     } catch (e) {
@@ -220,7 +222,8 @@ class WirelessAABridge {
       // BT link dropping is normal once projection is streaming over Wi-Fi;
       // only treat it as a setback if the TCP session isn't up yet.
       if (!AndroidAutoEngine().isSessionActive) {
-        _emit(AAConnectionStep.waitingForPhone, 'Open Android Auto on your phone');
+        _emit(AAConnectionStep.waitingForPhone,
+            'Bluetooth dropped — reconnect your phone to "$_bluetoothAlias"');
       }
     } else if (event.startsWith('ERROR')) {
       _emit(AAConnectionStep.error, event.substring('ERROR'.length).trim());
