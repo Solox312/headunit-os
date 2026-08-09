@@ -243,6 +243,40 @@ def main():
 
     manager = dbus.Interface(bus.get_object("org.bluez", "/org/bluez"),
                              "org.bluez.ProfileManager1")
+
+    # Explicit SDP record — BlueZ's auto-generated record from the bare
+    # RegisterProfile options proved unreliable (record absent from
+    # `sdptool browse local`), so spell out ServiceClassIDList, the
+    # L2CAP/RFCOMM protocol descriptor with our channel, browse group,
+    # and service name exactly.
+    service_record = f"""<?xml version="1.0" encoding="UTF-8" ?>
+<record>
+  <attribute id="0x0001">
+    <sequence>
+      <uuid value="{AA_WIRELESS_UUID}"/>
+    </sequence>
+  </attribute>
+  <attribute id="0x0004">
+    <sequence>
+      <sequence>
+        <uuid value="0x0100"/>
+      </sequence>
+      <sequence>
+        <uuid value="0x0003"/>
+        <uint8 value="0x{config.channel:02x}"/>
+      </sequence>
+    </sequence>
+  </attribute>
+  <attribute id="0x0005">
+    <sequence>
+      <uuid value="0x1002"/>
+    </sequence>
+  </attribute>
+  <attribute id="0x0100">
+    <text value="Android Auto Wireless"/>
+  </attribute>
+</record>"""
+
     try:
         manager.RegisterProfile(PROFILE_PATH, AA_WIRELESS_UUID, {
             "Name": "Android Auto Wireless",
@@ -250,6 +284,7 @@ def main():
             "Channel": dbus.UInt16(config.channel),
             "RequireAuthentication": dbus.Boolean(False),
             "RequireAuthorization": dbus.Boolean(False),
+            "ServiceRecord": service_record,
         })
     except dbus.exceptions.DBusException as exc:
         emit(f"ERROR profile registration failed: {exc}")
