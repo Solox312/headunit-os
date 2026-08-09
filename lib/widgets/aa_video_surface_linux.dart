@@ -12,11 +12,27 @@ class _LinuxVideoSurfaceState extends State<_LinuxVideoSurface> {
   @override
   void initState() {
     super.initState();
-    _player = Player();
+    _player = Player(
+      configuration: const PlayerConfiguration(
+        bufferSize: 1024 * 1024,
+      ),
+    );
     _controller = VideoController(_player);
 
-    // OpenAuto outputs H.264 over UDP — libmpv opens it as a live stream.
-    _player.open(Media('udp://127.0.0.1:5556'), play: true);
+    _initStream();
+  }
+
+  Future<void> _initStream() async {
+    try {
+      final dynamic platform = _player.platform;
+      if (platform != null) {
+        await platform.setProperty('demuxer-lavf-format', 'h264');
+        await platform.setProperty('demuxer-lavf-o', 'probesize=32,analyzeduration=0');
+        await platform.setProperty('framedrop', 'vo');
+      }
+    } catch (_) {}
+
+    await _player.open(Media('udp://127.0.0.1:5556'), play: true);
   }
 
   @override
