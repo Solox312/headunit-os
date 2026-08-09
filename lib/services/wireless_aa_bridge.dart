@@ -58,9 +58,6 @@ class WirelessAABridge {
   static const String _hotspotPassword = 'headunit2024';
   static const String _bluetoothAlias = 'HeadUnit-OS';
 
-  /// Head unit's own IP on the hotspot subnet — nmcli ipv4.method=shared
-  /// always assigns 10.42.0.1 to the AP interface.
-  static const String _hotspotIp = '10.42.0.1';
   static const int _aaTcpPort = 50001;
 
   // ── Public API ───────────────────────────────────────────────────────────
@@ -191,11 +188,13 @@ class WirelessAABridge {
       return;
     }
 
+    // No --ip: the daemon detects the hotspot's real IP live from the
+    // wireless interface right before each handoff — nmcli's shared-mode
+    // address isn't reliably 10.42.0.1 on real hardware.
     _handoffProcess = await Process.start('python3', [
       scriptPath,
       '--ssid', _hotspotSsid,
       '--psk', _hotspotPassword,
-      '--ip', _hotspotIp,
       '--port', '$_aaTcpPort',
     ]);
 

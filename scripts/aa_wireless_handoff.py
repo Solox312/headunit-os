@@ -37,12 +37,16 @@
 #
 #  Usage:
 #    python3 aa_wireless_handoff.py --ssid HeadUnit-OS --psk headunit2024 \
-#        --ip 10.42.0.1 --port 50001
+#        --port 50001
+#  (--ip is only a fallback; the real hotspot IP is read live from the
+#  wireless interface right before each WifiStartRequest is sent.)
 # ==============================================================================
 import argparse
 import os
+import re
 import select
 import struct
+import subprocess
 import sys
 import threading
 import time
@@ -217,19 +221,48 @@ def read_frame(reader):
 
 # ── Handoff conversation ──────────────────────────────────────────────────────
 
+def _find_wireless_iface():
+    for iface in sorted(os.listdir("/sys/class/net")):
+        if iface.startswith("wl"):
+            return iface
+    return None
+
+
 def detect_bssid(explicit):
     if explicit:
         return explicit
     # The hotspot AP's MAC — for nmcli AP-mode hotspots this is the wireless
     # interface's own hardware address.
-    for iface in sorted(os.listdir("/sys/class/net")):
-        if iface.startswith("wl"):
-            try:
-                with open(f"/sys/class/net/{iface}/address") as f:
-                    return f.read().strip()
-            except OSError:
-                continue
+    iface = _find_wireless_iface()
+    if iface:
+        try:
+            with open(f"/sys/class/net/{iface}/address") as f:
+                return f.read().strip()
+        except OSError:
+            pass
     return "00:00:00:00:00:00"
+
+
+def detect_hotspot_ip(explicit):
+    """Live IP of the hotspot AP interface. nmcli's ipv4.method=shared does
+    NOT reliably assign 10.42.0.1 — it's been observed assigning
+    192.168.43.1 on real hardware — so this is read from the interface
+    itself right before use rather than assumed from a CLI default. Falls
+    back to --ip only if detection fails outright (e.g. hotspot not up
+    yet)."""
+    iface = _find_wireless_iface()
+    if iface:
+        try:
+            out = subprocess.run(
+                ["ip", "-4", "-o", "addr", "show", iface],
+                capture_output=True, text=True, timeout=2,
+            ).stdout
+            match = re.search(r"inet (\d+\.\d+\.\d+\.\d+)", out)
+            if match:
+                return match.group(1)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return explicit
 
 
 def handle_connection(fd, config, device_path):
@@ -254,9 +287,14 @@ def handle_connection(fd, config, device_path):
         else:
             emit("WIFI_VERSION_RESPONSE_TIMEOUT proceeding without it")
 
+        ip_address = detect_hotspot_ip(config.ip)
+        if not ip_address:
+            emit("ERROR could not determine hotspot IP (interface down and no --ip fallback given)")
+            return
+
         write_frame(fd, MSG_WIFI_START_REQUEST,
-                    encode_wifi_start_request(config.ip, config.port))
-        emit(f"WIFI_START_SENT ip={config.ip} port={config.port}")
+                    encode_wifi_start_request(ip_address, config.port))
+        emit(f"WIFI_START_SENT ip={ip_address} port={config.port}")
 
         while True:
             msg_id, payload = read_frame(reader)
@@ -400,8 +438,11 @@ def main():
     parser = argparse.ArgumentParser(description="Wireless Android Auto BT handoff daemon")
     parser.add_argument("--ssid", required=True)
     parser.add_argument("--psk", required=True)
-    parser.add_argument("--ip", default="10.42.0.1",
-                        help="Head unit IP on the hotspot (nmcli shared-mode default)")
+    parser.add_argument("--ip", default=None,
+                        help="Fallback head unit IP if live detection from the "
+                             "wireless interface fails (auto-detected per-connection "
+                             "otherwise — nmcli's shared-mode IP is not reliably "
+                             "10.42.0.1 on real hardware)")
     parser.add_argument("--port", type=int, default=50001)
     parser.add_argument("--bssid", default=None, help="Hotspot BSSID (auto-detected if omitted)")
     config = parser.parse_args()
