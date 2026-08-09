@@ -257,8 +257,8 @@ class _AAConnectionWizardState extends State<AAConnectionWizard>
                 _buildStep(
                   step: AAConnectionStep.waitingForPhone,
                   icon: Icons.phone_android_rounded,
-                  title: 'Open Android Auto',
-                  detail: 'Tap Android Auto on your phone',
+                  title: 'Waiting for Phone',
+                  detail: 'Re-pair Bluetooth if previously paired — connection starts automatically',
                   isUserAction: true,
                 ),
                 _buildConnector(AAConnectionStep.waitingForPhone),
