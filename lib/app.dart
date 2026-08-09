@@ -13,9 +13,17 @@ import 'providers/display_provider.dart';
 import 'providers/keyboard_provider.dart';
 import 'widgets/virtual_keyboard.dart';
 import 'screens/splash_screen.dart';
+import 'screens/main_navigation_screen.dart';
 
 class RpiHeadunitApp extends StatelessWidget {
-  const RpiHeadunitApp({super.key});
+  final bool skipSplash;
+  final int initialIndex;
+
+  const RpiHeadunitApp({
+    super.key,
+    this.skipSplash = false,
+    this.initialIndex = 0,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +87,9 @@ class RpiHeadunitApp extends StatelessWidget {
         title: 'HeadUnit OS',
         debugShowCheckedModeBanner: false,
         theme: AutomotiveTheme.darkTheme,
-        home: const SplashScreen(),
+        home: skipSplash
+            ? MainNavigationScreen(initialIndex: initialIndex)
+            : const SplashScreen(),
         builder: (context, child) {
           return HardwareCursorOverlay(
             child: Stack(
