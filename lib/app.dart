@@ -27,7 +27,30 @@ class RpiHeadunitApp extends StatelessWidget {
         // user ever opens the projection screen.
         ChangeNotifierProvider(create: (_) => ProjectionProvider(), lazy: false),
         ChangeNotifierProvider(create: (_) => WifiProvider()),
-        ChangeNotifierProvider(create: (_) => BluetoothProvider()),
+        ChangeNotifierProvider(
+          create: (context) {
+            final bt = BluetoothProvider();
+            // Wire AVRCP track updates → MediaProvider so the Media tab shows live song info.
+            bt.onTrackUpdate = (title, artist, album, duration, isPlaying) {
+              final media = context.read<MediaProvider>();
+              media.setAudioMode(AudioSourceMode.bluetooth);
+              media.updateTrackInfo(
+                title: title,
+                artist: artist,
+                album: album,
+                duration: duration,
+                isPlaying: isPlaying,
+                source: 'Bluetooth Audio',
+              );
+            };
+            bt.onDeviceDisconnected = () {
+              final media = context.read<MediaProvider>();
+              media.clearMedia();
+            };
+            return bt;
+          },
+          lazy: false,
+        ),
         ChangeNotifierProvider(create: (_) => FmTransmitterProvider()),
         ChangeNotifierProvider(create: (_) => DisplayProvider()),
         ChangeNotifierProvider(create: (_) => KeyboardProvider()),

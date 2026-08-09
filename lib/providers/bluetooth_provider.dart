@@ -1,16 +1,20 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/bluetooth_device.dart';
+import '../models/media_item.dart';
 import '../services/bluetooth_service.dart';
+import '../services/avrcp_service.dart';
 
 class BluetoothProvider extends ChangeNotifier {
   final BluetoothService _service = BluetoothService();
+  final AvrcpService _avrcp = AvrcpService();
 
   bool _isBluetoothEnabled = true;
   bool _isDiscoverable = true;
   bool _isScanning = false;
   bool _isConnecting = false;
   String? _errorMessage;
+  String? _lastConnectedMac;
 
   List<BluetoothDevice> _pairedDevices = [];
   List<BluetoothDevice> _discoveredDevices = [];
@@ -32,7 +36,13 @@ class BluetoothProvider extends ChangeNotifier {
     }
   }
 
+  /// Callback to notify MediaProvider of live AVRCP track updates.
+  /// Set this from the app root after both providers are initialized.
+  void Function(String title, String artist, String album, Duration duration, bool isPlaying)? onTrackUpdate;
+  void Function()? onDeviceDisconnected;
+
   Timer? _pollingTimer;
+  StreamSubscription<AvrcpTrackInfo>? _avrcpSub;
 
   BluetoothProvider() {
     init();
@@ -46,6 +56,25 @@ class BluetoothProvider extends ChangeNotifier {
       await scanDevices();
     }
     _startPollingTimer();
+    _subscribeAvrcpUpdates();
+  }
+
+  /// Subscribe to AVRCP track info updates and forward them to MediaProvider.
+  void _subscribeAvrcpUpdates() {
+    _avrcpSub?.cancel();
+    _avrcpSub = _avrcp.onTrackChanged.listen((track) {
+      if (track.hasTrack) {
+        onTrackUpdate?.call(
+          track.title,
+          track.artist,
+          track.album,
+          track.duration,
+          track.isPlaying,
+        );
+      } else {
+        onDeviceDisconnected?.call();
+      }
+    });
   }
 
   void _startPollingTimer() {
@@ -53,6 +82,19 @@ class BluetoothProvider extends ChangeNotifier {
     _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       if (_isBluetoothEnabled && !_isScanning && !_isConnecting) {
         await refreshPairedDevices();
+
+        // Start or stop AVRCP polling based on connection state
+        final connected = connectedDevice;
+        if (connected != null && connected.macAddress != _lastConnectedMac) {
+          _lastConnectedMac = connected.macAddress;
+          _avrcp.startPolling(connected.macAddress);
+          if (kDebugMode) print('[BluetoothProvider] AVRCP polling started for ${connected.name}');
+        } else if (connected == null && _lastConnectedMac != null) {
+          _lastConnectedMac = null;
+          _avrcp.stopPolling();
+          onDeviceDisconnected?.call();
+          if (kDebugMode) print('[BluetoothProvider] Device disconnected — AVRCP polling stopped.');
+        }
       }
     });
   }
@@ -60,6 +102,8 @@ class BluetoothProvider extends ChangeNotifier {
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    _avrcpSub?.cancel();
+    _avrcp.stopPolling();
     super.dispose();
   }
 
@@ -80,6 +124,7 @@ class BluetoothProvider extends ChangeNotifier {
       } else {
         _pairedDevices = [];
         _discoveredDevices = [];
+        _avrcp.stopPolling();
       }
     } else {
       _isBluetoothEnabled = !enabled;
@@ -109,7 +154,7 @@ class BluetoothProvider extends ChangeNotifier {
       _discoveredDevices = await _service.scanDevices();
       await refreshPairedDevices();
     } catch (e) {
-      _errorMessage = "Failed to scan Bluetooth devices: $e";
+      _errorMessage = 'Failed to scan Bluetooth devices: $e';
     } finally {
       _isScanning = false;
       notifyListeners();
@@ -128,11 +173,11 @@ class BluetoothProvider extends ChangeNotifier {
         _discoveredDevices.removeWhere((dev) => dev.macAddress == macAddress);
         return true;
       } else {
-        _errorMessage = "Failed to pair with device ($macAddress). Ensure device is in pairing mode.";
+        _errorMessage = 'Failed to pair with device ($macAddress). Ensure device is in pairing mode.';
         return false;
       }
     } catch (e) {
-      _errorMessage = "Error pairing device: $e";
+      _errorMessage = 'Error pairing device: $e';
       return false;
     } finally {
       _isConnecting = false;
@@ -146,6 +191,8 @@ class BluetoothProvider extends ChangeNotifier {
 
     try {
       await _service.disconnect(macAddress);
+      _avrcp.stopPolling();
+      _lastConnectedMac = null;
       await refreshPairedDevices();
     } finally {
       _isConnecting = false;
@@ -164,5 +211,28 @@ class BluetoothProvider extends ChangeNotifier {
       _isConnecting = false;
       notifyListeners();
     }
+  }
+
+  /// Send AVRCP play/pause toggle to the connected device.
+  Future<void> avrcpTogglePlayPause(bool isCurrentlyPlaying) async {
+    final mac = connectedDevice?.macAddress;
+    if (mac == null) return;
+    if (isCurrentlyPlaying) {
+      await _avrcp.sendPause(mac);
+    } else {
+      await _avrcp.sendPlay(mac);
+    }
+  }
+
+  /// Send AVRCP next track to the connected device.
+  Future<void> avrcpNext() async {
+    final mac = connectedDevice?.macAddress;
+    if (mac != null) await _avrcp.sendNext(mac);
+  }
+
+  /// Send AVRCP previous track to the connected device.
+  Future<void> avrcpPrevious() async {
+    final mac = connectedDevice?.macAddress;
+    if (mac != null) await _avrcp.sendPrevious(mac);
   }
 }

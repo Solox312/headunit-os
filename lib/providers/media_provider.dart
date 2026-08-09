@@ -48,10 +48,11 @@ class MediaProvider extends ChangeNotifier {
   void updateTrackInfo({
     required String title,
     required String artist,
-    String album = "",
-    String coverUrl = "",
+    String album = '',
+    String coverUrl = '',
     Duration duration = Duration.zero,
-    String source = "Connected Device",
+    String source = 'Connected Device',
+    bool isPlaying = true,
   }) {
     _mediaItem = MediaItem(
       hasMedia: true,
@@ -61,7 +62,7 @@ class MediaProvider extends ChangeNotifier {
       coverUrl: coverUrl,
       duration: duration,
       position: Duration.zero,
-      isPlaying: true,
+      isPlaying: isPlaying,
       volume: _mediaItem.volume,
       source: source,
       audioMode: _mediaItem.audioMode,
