@@ -52,7 +52,13 @@ except ImportError as exc:
     emit(f"ERROR missing python dependency ({exc}) — run: sudo apt install python3-dbus python3-gi")
     sys.exit(1)
 
-AA_WIRELESS_UUID = "4de17a00-52cb-11e6-bdf4-0800200c9a66"
+# Older Gearhead builds host the wireless AA RFCOMM service on the classic
+# AAWireless UUID; newer builds moved to a Google vendor-specific UUID (seen
+# advertised by e.g. Pixel 8 Pro). Register and dial both, preferring
+# whichever the phone actually advertises.
+AA_WIRELESS_UUID_CLASSIC = "4de17a00-52cb-11e6-bdf4-0800200c9a66"
+AA_WIRELESS_UUID_VENDOR = "a3c87600-0005-1000-8000-001a11000100"
+AA_UUID_CANDIDATES = [AA_WIRELESS_UUID_VENDOR, AA_WIRELESS_UUID_CLASSIC]
 PROFILE_PATH = "/org/headunitos/aa_wireless"
 
 # Message ids on the RFCOMM handoff link
@@ -204,25 +210,39 @@ def start_connect_loop(device_path):
     threading.Thread(target=_connect_loop, args=(device_path,), daemon=True).start()
 
 
+def _advertised_candidates(device_path):
+    """Order candidate UUIDs by what the phone's SDP actually lists."""
+    try:
+        props = dbus.Interface(_bus.get_object("org.bluez", device_path),
+                               "org.freedesktop.DBus.Properties")
+        advertised = {str(u).lower() for u in props.Get("org.bluez.Device1", "UUIDs")}
+    except dbus.exceptions.DBusException:
+        advertised = set()
+    preferred = [u for u in AA_UUID_CANDIDATES if u in advertised]
+    return preferred if preferred else list(AA_UUID_CANDIDATES)
+
+
 def _connect_loop(device_path):
     try:
-        emit(f"PHONE_SEEN {device_path}")
+        candidates = _advertised_candidates(device_path)
+        emit(f"PHONE_SEEN {device_path} candidates={','.join(candidates)}")
         for attempt in range(1, CONNECT_ATTEMPTS + 1):
-            with _lock:
-                if device_path in _active_devices:
-                    return
-            try:
-                device = dbus.Interface(_bus.get_object("org.bluez", device_path),
-                                        "org.bluez.Device1")
-                device.ConnectProfile(AA_WIRELESS_UUID, timeout=30)
-                emit(f"CONNECT_PROFILE_OK {device_path}")
-                return  # BlueZ delivers the fd via Profile1.NewConnection
-            except dbus.exceptions.DBusException as exc:
-                name = exc.get_dbus_name() or ""
-                if "AlreadyConnected" in name or "InProgress" in name:
-                    return
-                emit(f"CONNECT_ATTEMPT_FAILED attempt={attempt} device={device_path} error={name}: {exc}")
-                time.sleep(CONNECT_RETRY_DELAY_S)
+            for uuid in candidates:
+                with _lock:
+                    if device_path in _active_devices:
+                        return
+                try:
+                    device = dbus.Interface(_bus.get_object("org.bluez", device_path),
+                                            "org.bluez.Device1")
+                    device.ConnectProfile(uuid, timeout=30)
+                    emit(f"CONNECT_PROFILE_OK {device_path} uuid={uuid}")
+                    return  # BlueZ delivers the fd via Profile1.NewConnection
+                except dbus.exceptions.DBusException as exc:
+                    name = exc.get_dbus_name() or ""
+                    if "AlreadyConnected" in name or "InProgress" in name:
+                        return
+                    emit(f"CONNECT_ATTEMPT_FAILED attempt={attempt} uuid={uuid} device={device_path} error={name}: {exc}")
+            time.sleep(CONNECT_RETRY_DELAY_S)
         emit(f"CONNECT_GAVE_UP {device_path}")
     finally:
         with _lock:
@@ -286,23 +306,31 @@ def main():
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     _bus = dbus.SystemBus()
 
-    AAWirelessProfile(_bus, PROFILE_PATH, config)
-
     manager = dbus.Interface(_bus.get_object("org.bluez", "/org/bluez"),
                              "org.bluez.ProfileManager1")
-    try:
-        # No Role restriction: we mainly connect outward (ConnectProfile),
-        # but stay open to phone-initiated connections too.
-        manager.RegisterProfile(PROFILE_PATH, AA_WIRELESS_UUID, {
-            "Name": "Android Auto Wireless",
-            "RequireAuthentication": dbus.Boolean(False),
-            "RequireAuthorization": dbus.Boolean(False),
-        })
-    except dbus.exceptions.DBusException as exc:
-        emit(f"ERROR profile registration failed: {exc}")
-        sys.exit(1)
 
-    emit(f"PROFILE_REGISTERED uuid={AA_WIRELESS_UUID}")
+    # One profile object per candidate UUID — BlueZ routes the resulting fd
+    # to whichever profile matches the UUID that connected. No Role
+    # restriction: we mainly connect outward (ConnectProfile), but stay open
+    # to phone-initiated connections too.
+    registered_paths = []
+    for index, uuid in enumerate(AA_UUID_CANDIDATES):
+        path = f"{PROFILE_PATH}{index}"
+        try:
+            AAWirelessProfile(_bus, path, config)
+            manager.RegisterProfile(path, uuid, {
+                "Name": "Android Auto Wireless",
+                "RequireAuthentication": dbus.Boolean(False),
+                "RequireAuthorization": dbus.Boolean(False),
+            })
+            registered_paths.append(path)
+            emit(f"PROFILE_REGISTERED uuid={uuid}")
+        except dbus.exceptions.DBusException as exc:
+            emit(f"PROFILE_REGISTER_FAILED uuid={uuid} error={exc}")
+
+    if not registered_paths:
+        emit("ERROR no AA profile could be registered")
+        sys.exit(1)
 
     # Watch for phones connecting, and dial any phone that's already here.
     _bus.add_signal_receiver(
@@ -320,10 +348,11 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        try:
-            manager.UnregisterProfile(PROFILE_PATH)
-        except dbus.exceptions.DBusException:
-            pass
+        for path in registered_paths:
+            try:
+                manager.UnregisterProfile(path)
+            except dbus.exceptions.DBusException:
+                pass
 
 
 if __name__ == "__main__":
