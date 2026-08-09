@@ -119,6 +119,18 @@ def encode_wifi_info_response(ssid, psk, bssid):
 
 
 # ── Framed RFCOMM I/O over a raw fd ───────────────────────────────────────────
+#
+# The wire format below (2-byte length, 2-byte msg id, protobuf payload) is
+# the classic AAWireless-reverse-engineered protocol. It's unconfirmed for
+# the newer Google vendor-specific service UUID some phones now host this
+# handshake on — so every raw read is hex-dumped as RX_RAW before we try to
+# interpret it as a frame, giving a ground-truth trace to diagnose a framing
+# mismatch instead of hanging silently.
+
+SELECT_POLL_S = 5
+HEARTBEAT_EVERY_S = 15
+RX_HEX_DUMP_LIMIT = 64
+
 
 def write_frame(fd, msg_id, payload):
     frame = struct.pack(">HH", len(payload), msg_id) + payload
@@ -127,23 +139,47 @@ def write_frame(fd, msg_id, payload):
         frame = frame[written:]
 
 
-def read_exact(fd, count):
-    buf = bytearray()
-    while len(buf) < count:
-        select.select([fd], [], [])
-        chunk = os.read(fd, count - len(buf))
-        if not chunk:
-            return None  # EOF — phone closed the link
-        buf.extend(chunk)
-    return bytes(buf)
+class RawReader:
+    """Buffered reader over the raw fd that logs every chunk received (as
+    hex) before any frame-format assumptions are applied on top of it."""
+
+    def __init__(self, fd):
+        self._fd = fd
+        self._buf = bytearray()
+
+    def _fill(self, min_bytes):
+        last_heartbeat = time.monotonic()
+        while len(self._buf) < min_bytes:
+            ready, _, _ = select.select([self._fd], [], [], SELECT_POLL_S)
+            if not ready:
+                now = time.monotonic()
+                if now - last_heartbeat >= HEARTBEAT_EVERY_S:
+                    emit("WAITING_FOR_PHONE_RESPONSE no data received yet")
+                    last_heartbeat = now
+                continue
+            chunk = os.read(self._fd, 4096)
+            if not chunk:
+                return False  # EOF — phone closed the link
+            preview = chunk[:RX_HEX_DUMP_LIMIT].hex()
+            more = "..." if len(chunk) > RX_HEX_DUMP_LIMIT else ""
+            emit(f"RX_RAW len={len(chunk)} hex={preview}{more}")
+            self._buf.extend(chunk)
+        return True
+
+    def read_exact(self, count):
+        if not self._fill(count):
+            return None
+        data = bytes(self._buf[:count])
+        del self._buf[:count]
+        return data
 
 
-def read_frame(fd):
-    header = read_exact(fd, 4)
+def read_frame(reader):
+    header = reader.read_exact(4)
     if header is None:
         return None, None
     length, msg_id = struct.unpack(">HH", header)
-    payload = read_exact(fd, length) if length else b""
+    payload = reader.read_exact(length) if length else b""
     if length and payload is None:
         return None, None
     return msg_id, payload
@@ -172,8 +208,9 @@ def handle_connection(fd, config, device_path):
                     encode_wifi_start_request(config.ip, config.port))
         emit(f"WIFI_START_SENT ip={config.ip} port={config.port}")
 
+        reader = RawReader(fd)
         while True:
-            msg_id, payload = read_frame(fd)
+            msg_id, payload = read_frame(reader)
             if msg_id is None:
                 emit("PHONE_DISCONNECTED")
                 return
