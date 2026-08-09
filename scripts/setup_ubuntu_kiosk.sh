@@ -164,23 +164,22 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
-# Silence low-level kernel and DRM console warnings on TTY1
-sudo dmesg -n 1 2>/dev/null || true
+# Silence low-level kernel console warnings persistently (dmesg -n alone
+# doesn't survive reboot — the kernel resets console_loglevel to its
+# compiled-in default). This is a kiosk: nothing should ever render text
+# to a VT, so also fully mask getty@tty1 rather than just auto-logging it
+# in — an idle autologin shell can still flash on screen during display
+# handovers (e.g. the brief gap when openauto.service takes over DRM
+# master from headunit.service).
+echo 'kernel.printk = 3 4 1 7' | sudo tee /etc/sysctl.d/99-headunit-console.conf > /dev/null
+sudo sysctl --system > /dev/null
 
 sudo systemctl set-default multi-user.target
 sudo systemctl daemon-reload
 sudo systemctl enable headunit.service
 
-# Configure TTY1 auto-login so Ubuntu Server boots directly into HeadUnit OS without login prompts
-sudo mkdir -p /etc/systemd/system/getty@tty1.service.d/
-sudo tee /etc/systemd/system/getty@tty1.service.d/override.conf > /dev/null << EOF
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --noissue --autologin $CURRENT_USER %I \$TERM
-Type=idle
-EOF
-
-sudo systemctl daemon-reload
+sudo systemctl disable --now getty@tty1.service 2>/dev/null || true
+sudo systemctl mask getty@tty1.service
 
 echo -e "${GREEN}✓ Kiosk service & auto-boot enabled.${NC}"
 echo ""
