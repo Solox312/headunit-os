@@ -52,17 +52,21 @@ class BluetoothService {
       _agentOutputSub?.cancel();
       _persistentAgentProcess = await Process.start('bluetoothctl', []);
 
-      _persistentAgentProcess!.stdin.writeln('agent DisplayYesNo');
-      _persistentAgentProcess!.stdin.writeln('default-agent');
-      _persistentAgentProcess!.stdin.writeln('discoverable on');
-      _persistentAgentProcess!.stdin.writeln('pairable on');
-
-      // Auto-confirm any passkey / authorization request
+      // Wait for bluetoothctl to connect to bluetoothd and show [bluetooth]# prompt
+      // before registering agent — otherwise "Failed to register agent object" occurs.
+      final completer = Completer<void>();
       final agentStream = _persistentAgentProcess!.stdout
           .transform(const SystemEncoding().decoder)
           .transform(const LineSplitter());
+
       _agentOutputSub = agentStream.listen((line) {
         if (kDebugMode) print('[BT-Agent] $line');
+
+        // Wait for ready prompt before sending registration commands
+        if (!completer.isCompleted && line.contains('[bluetooth]#')) {
+          completer.complete();
+        }
+
         final l = line.toLowerCase();
         if (l.contains('confirm passkey') || l.contains('(yes/no)')) {
           _persistentAgentProcess!.stdin.writeln('yes');
@@ -72,6 +76,14 @@ class BluetoothService {
           if (kDebugMode) print('[BT-Agent] Auto-authorized service.');
         }
       });
+
+      // Wait up to 5 seconds for the [bluetooth]# prompt, then send agent commands
+      await completer.future.timeout(const Duration(seconds: 5), onTimeout: () {});
+      _persistentAgentProcess!.stdin.writeln('agent DisplayYesNo');
+      await Future.delayed(const Duration(milliseconds: 500));
+      _persistentAgentProcess!.stdin.writeln('default-agent');
+      _persistentAgentProcess!.stdin.writeln('discoverable on');
+      _persistentAgentProcess!.stdin.writeln('pairable on');
 
       if (kDebugMode) print('[BluetoothService] Persistent DisplayYesNo auto-confirm agent running.');
       return true;
