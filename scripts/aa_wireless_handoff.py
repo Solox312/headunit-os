@@ -341,10 +341,22 @@ def _connect_loop(device_path):
 
 
 def on_properties_changed(interface, changed, invalidated, path=None):
-    if interface != "org.bluez.Device1" or path is None:
-        return
-    if bool(changed.get("Connected", False)):
-        start_connect_loop(str(path))
+    # Diagnostic instrumentation: every previously-successful connect in this
+    # daemon came from connect_already_connected_devices() at startup — this
+    # live signal path has never been proven to actually fire. Log receipt
+    # unconditionally and guard the body, since dbus-python signal callbacks
+    # that raise are silently swallowed by the GLib mainloop (no traceback,
+    # no crash — just nothing happens), which would look identical to the
+    # signal simply never arriving.
+    try:
+        emit(f"PROPS_CHANGED_RX interface={interface} path={path} keys={list(changed.keys())}")
+        if interface != "org.bluez.Device1" or path is None:
+            return
+        if bool(changed.get("Connected", False)):
+            emit(f"DEVICE_CONNECTED_SIGNAL {path}")
+            start_connect_loop(str(path))
+    except Exception as exc:
+        emit(f"ERROR on_properties_changed: {exc}")
 
 
 def connect_already_connected_devices():
