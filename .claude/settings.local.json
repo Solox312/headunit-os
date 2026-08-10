@@ -9,7 +9,19 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Read(//c/Users/cnieves.wmg/.ssh/**)",
+      "Bash(python3 -c \"import paramiko\")",
+      "Bash(python -c \"import paramiko\")",
+      "Bash(pip install *)",
+      "Bash(python *)",
+      "Bash(ping *)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(grep *)",
+      "Bash(bash -n \"C:\\\\Users\\\\cnieves.wmg\\\\Desktop\\\\Projects\\\\headunit-os\\\\scripts\\\\install_openauto.sh\")",
+      "Bash(bash -n \"C:\\\\Users\\\\cnieves.wmg\\\\Desktop\\\\Projects\\\\headunit-os\\\\scripts\\\\setup_ubuntu_kiosk.sh\")"
     ]
   }
 }
