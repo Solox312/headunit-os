@@ -181,6 +181,15 @@ sudo systemctl enable headunit.service
 sudo systemctl disable --now getty@tty1.service 2>/dev/null || true
 sudo systemctl mask getty@tty1.service
 
+# Masking getty@tty1 means carl never gets a login session, so nothing
+# used to create /run/user/<uid> or start the user's PulseAudio socket.
+# openauto.service depends on XDG_RUNTIME_DIR=/run/user/<uid> for audio —
+# without lingering that directory doesn't exist, PulseAudio fails to
+# connect, and that instability drags down the whole AA session (see
+# openauto.service's own comment on ExecStart) including its ping
+# keepalive, killing the session ~60s in.
+sudo loginctl enable-linger "$CURRENT_USER"
+
 echo -e "${GREEN}✓ Kiosk service & auto-boot enabled.${NC}"
 echo ""
 echo -e "${GREEN}══════════════════════════════════════════════════════════════${NC}"
