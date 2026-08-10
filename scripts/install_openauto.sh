@@ -150,13 +150,24 @@ with open(app_cpp) as f:
 if '#include <cstdlib>' not in content:
     content = content.replace(
         'along with openauto. If not, see <http://www.gnu.org/licenses/>.\n*/',
-        'along with openauto. If not, see <http://www.gnu.org/licenses/>.\n*/\n#include <cstdlib>',
+        'along with openauto. If not, see <http://www.gnu.org/licenses/>.\n*/\n#include <cstdlib>\n#include <boost/asio/deadline_timer.hpp>',
         1)
 
 # 1) enumerateDevices(): pick up a phone that's already in AOAP accessory
 #    mode at startup instead of only reacting to a fresh USB hotplug event —
 #    needed because openauto.service starts on demand, after the phone may
-#    have already been switched into accessory mode.
+#    have already been switched into accessory mode. A 750ms settle delay
+#    before reopening it is required: the enumerator's own accessory-mode
+#    query chain may have just switched the device into AOAP mode, which
+#    triggers a full USB re-enumeration on the device side (standard AOA
+#    protocol behavior). Opening it again immediately races that
+#    re-enumeration and can grab a handle that isn't ready yet, failing
+#    every channel within milliseconds of connecting (AaSdk error 26) —
+#    which then looks like the USB tap silently did nothing, since
+#    quick_exit-on-disconnect restores HeadUnit OS before anyone can see
+#    it. Confirmed via live testing 2026-08-09: without the delay, the
+#    very first tap after a fresh plug-in reliably failed this way and
+#    needed a second tap to succeed; with it, the first tap works.
 old_enum = '''void App::enumerateDevices()
 {
     auto promise = aasdk::usb::IConnectedAccessoriesEnumerator::Promise::defer(strand_);
@@ -181,17 +192,25 @@ new_enum = '''void App::enumerateDevices()
             {
                 OPENAUTO_LOG(info) << \"[App] Found existing connected AOAP accessory! Connecting immediately...\";
 
-                auto deviceHandle = usbWrapper_.openDeviceWithVidPid(0x18D1, 0x2D00);
-                if(deviceHandle == nullptr)
-                {
-                    deviceHandle = usbWrapper_.openDeviceWithVidPid(0x18D1, 0x2D01);
-                }
+                auto timer = std::make_shared<boost::asio::deadline_timer>(ioService_, boost::posix_time::milliseconds(750));
+                timer->async_wait(strand_.wrap([this, self, timer](const boost::system::error_code&) {
+                    if(androidAutoEntity_ != nullptr)
+                    {
+                        return;
+                    }
 
-                if(deviceHandle != nullptr)
-                {
-                    OPENAUTO_LOG(info) << \"[App] Successfully opened existing AOAP accessory handle!\";
-                    this->aoapDeviceHandler(std::move(deviceHandle));
-                }
+                    auto deviceHandle = usbWrapper_.openDeviceWithVidPid(0x18D1, 0x2D00);
+                    if(deviceHandle == nullptr)
+                    {
+                        deviceHandle = usbWrapper_.openDeviceWithVidPid(0x18D1, 0x2D01);
+                    }
+
+                    if(deviceHandle != nullptr)
+                    {
+                        OPENAUTO_LOG(info) << \"[App] Successfully opened existing AOAP accessory handle!\";
+                        this->aoapDeviceHandler(std::move(deviceHandle));
+                    }
+                }));
             }
         },
         [this, self = this->shared_from_this()](auto e) {
