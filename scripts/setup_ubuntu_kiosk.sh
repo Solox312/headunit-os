@@ -190,6 +190,27 @@ sudo systemctl mask getty@tty1.service
 # keepalive, killing the session ~60s in.
 sudo loginctl enable-linger "$CURRENT_USER"
 
+# Defensive guard, not a fix for anything this script itself causes: found
+# 2026-08-09 that a prior manual debugging session had left this box with
+# audio completely silenced three different ways — /etc/asound.conf and
+# ~/.asoundrc both forcing the ALSA default device to "type null", and
+# /dev/snd itself missing its execute/traversal bit (mode 0666 instead of
+# 0755, so non-root couldn't even stat the device files inside it despite
+# correct per-file permissions). None of this is set by any script in this
+# repo, so it can only have been done by hand — but it's cheap insurance
+# to check for and undo on every install, since it's a silent failure
+# (PulseAudio falls back to a null sink with no visible error).
+for asoundrc in /etc/asound.conf "$USER_HOME/.asoundrc"; do
+  if [[ -f "$asoundrc" ]] && grep -q 'type null' "$asoundrc" 2>/dev/null; then
+    warn "Found a null-audio override at $asoundrc — disabling it."
+    sudo mv "$asoundrc" "$asoundrc.disabled-$(date +%Y%m%d)"
+  fi
+done
+if [[ -d /dev/snd ]] && [[ "$(stat -c '%a' /dev/snd)" != "755" ]]; then
+  warn "/dev/snd has non-standard permissions ($(stat -c '%a' /dev/snd)) — fixing to 755."
+  sudo chmod 755 /dev/snd
+fi
+
 echo -e "${GREEN}✓ Kiosk service & auto-boot enabled.${NC}"
 echo ""
 echo -e "${GREEN}══════════════════════════════════════════════════════════════${NC}"

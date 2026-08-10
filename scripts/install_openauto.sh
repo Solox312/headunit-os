@@ -102,6 +102,250 @@ for path in glob.glob('aasdk/**/*.hpp', recursive=True):
 # on -fpermissive alone.
 sed -i 's/LIBUSB_HOTPLUG_NO_FLAGS/static_cast<libusb_hotplug_flag>(LIBUSB_HOTPLUG_NO_FLAGS)/g' \
   aasdk/src/USB/USBHub.cpp
+
+info "Patching aasdk MessageInStream for concurrent multi-channel message reassembly..."
+# vanilla aasdk tracks exactly ONE in-progress multi-frame message globally
+# (a single message_ member in MessageInStream). The physical transport is
+# shared by every channel, and frames from different channels legitimately
+# interleave on the wire once more than one channel streams continuously at
+# once (e.g. video + media audio both active) — vanilla rejects that as
+# MESSENGER_INTERTWINED_CHANNELS, which made concurrent audio+video AA
+# sessions fail within milliseconds of the audio channel opening. Fix:
+# track one in-progress message PER CHANNEL (a map keyed by ChannelId)
+# instead of a single global one, so each channel's partial message
+# survives independently until its own final frame arrives. Reconstructed
+# and verified live 2026-08-09 — see memory: aa-audio-through-headunit.
+python3 -c "
+path = 'aasdk/include/f1x/aasdk/Messenger/MessageInStream.hpp'
+with open(path) as f:
+    content = f.read()
+
+if '#include <map>' not in content:
+    content = content.replace(
+        '#include <f1x/aasdk/Messenger/FrameSize.hpp>',
+        '#include <f1x/aasdk/Messenger/FrameSize.hpp>\n#include <map>',
+        1)
+
+old_members = '''    FrameType recentFrameType_;
+    ReceivePromise::Pointer promise_;
+    Message::Pointer message_;'''
+new_members = '''    FrameType recentFrameType_;
+    ReceivePromise::Pointer promise_;
+    std::map<ChannelId, Message::Pointer> pendingMessages_;
+    ChannelId currentChannelId_;'''
+assert old_members in content, 'MessageInStream.hpp member block not found — aasdk source may have changed upstream'
+content = content.replace(old_members, new_members)
+
+with open(path, 'w') as f:
+    f.write(content)
+
+path = 'aasdk/src/Messenger/MessageInStream.cpp'
+with open(path) as f:
+    content = f.read()
+
+# Normalize trailing whitespace per line so the multi-line literal matches
+# below don't silently fail on invisible trailing spaces in the original
+# source (e.g. '{   \n' instead of '{\n').
+content = '\n'.join(line.rstrip() for line in content.split('\n'))
+
+old_header_handler = '''void MessageInStream::receiveFrameHeaderHandler(const common::DataConstBuffer& buffer)
+{
+    FrameHeader frameHeader(buffer);
+
+    if(message_ == nullptr)
+    {
+        message_ = std::make_shared<Message>(frameHeader.getChannelId(), frameHeader.getEncryptionType(), frameHeader.getMessageType());
+    }
+    else if(message_->getChannelId() != frameHeader.getChannelId())
+    {
+        message_.reset();
+        promise_->reject(error::Error(error::ErrorCode::MESSENGER_INTERTWINED_CHANNELS));
+        promise_.reset();
+        return;
+    }
+
+    recentFrameType_ = frameHeader.getType();
+    const size_t frameSize = FrameSize::getSizeOf(frameHeader.getType() == FrameType::FIRST ? FrameSizeType::EXTENDED : FrameSizeType::SHORT);
+
+    auto transportPromise = transport::ITransport::ReceivePromise::defer(strand_);
+    transportPromise->then(
+        [this, self = this->shared_from_this()](common::Data data) mutable {
+            this->receiveFrameSizeHandler(common::DataConstBuffer(data));
+        },
+        [this, self = this->shared_from_this()](const error::Error& e) mutable {
+            message_.reset();
+            promise_->reject(e);
+            promise_.reset();
+        });
+
+    transport_->receive(frameSize, std::move(transportPromise));
+}'''
+
+new_header_handler = '''void MessageInStream::receiveFrameHeaderHandler(const common::DataConstBuffer& buffer)
+{
+    FrameHeader frameHeader(buffer);
+    currentChannelId_ = frameHeader.getChannelId();
+
+    if(pendingMessages_.find(currentChannelId_) == pendingMessages_.end())
+    {
+        pendingMessages_.emplace(currentChannelId_,
+            std::make_shared<Message>(frameHeader.getChannelId(), frameHeader.getEncryptionType(), frameHeader.getMessageType()));
+    }
+
+    recentFrameType_ = frameHeader.getType();
+    const size_t frameSize = FrameSize::getSizeOf(frameHeader.getType() == FrameType::FIRST ? FrameSizeType::EXTENDED : FrameSizeType::SHORT);
+
+    auto transportPromise = transport::ITransport::ReceivePromise::defer(strand_);
+    transportPromise->then(
+        [this, self = this->shared_from_this()](common::Data data) mutable {
+            this->receiveFrameSizeHandler(common::DataConstBuffer(data));
+        },
+        [this, self = this->shared_from_this()](const error::Error& e) mutable {
+            pendingMessages_.erase(currentChannelId_);
+            promise_->reject(e);
+            promise_.reset();
+        });
+
+    transport_->receive(frameSize, std::move(transportPromise));
+}'''
+
+assert old_header_handler in content, 'receiveFrameHeaderHandler not found — aasdk source may have changed upstream'
+content = content.replace(old_header_handler, new_header_handler)
+
+old_size_handler = '''void MessageInStream::receiveFrameSizeHandler(const common::DataConstBuffer& buffer)
+{
+    auto transportPromise = transport::ITransport::ReceivePromise::defer(strand_);
+    transportPromise->then(
+        [this, self = this->shared_from_this()](common::Data data) mutable {
+            this->receiveFramePayloadHandler(common::DataConstBuffer(data));
+        },
+        [this, self = this->shared_from_this()](const error::Error& e) mutable {
+            message_.reset();
+            promise_->reject(e);
+            promise_.reset();
+        });
+
+    FrameSize frameSize(buffer);
+    transport_->receive(frameSize.getSize(), std::move(transportPromise));
+}'''
+
+new_size_handler = '''void MessageInStream::receiveFrameSizeHandler(const common::DataConstBuffer& buffer)
+{
+    auto transportPromise = transport::ITransport::ReceivePromise::defer(strand_);
+    transportPromise->then(
+        [this, self = this->shared_from_this()](common::Data data) mutable {
+            this->receiveFramePayloadHandler(common::DataConstBuffer(data));
+        },
+        [this, self = this->shared_from_this()](const error::Error& e) mutable {
+            pendingMessages_.erase(currentChannelId_);
+            promise_->reject(e);
+            promise_.reset();
+        });
+
+    FrameSize frameSize(buffer);
+    transport_->receive(frameSize.getSize(), std::move(transportPromise));
+}'''
+
+assert old_size_handler in content, 'receiveFrameSizeHandler not found — aasdk source may have changed upstream'
+content = content.replace(old_size_handler, new_size_handler)
+
+old_payload_handler = '''void MessageInStream::receiveFramePayloadHandler(const common::DataConstBuffer& buffer)
+{
+    if(message_->getEncryptionType() == EncryptionType::ENCRYPTED)
+    {
+        try
+        {
+            cryptor_->decrypt(message_->getPayload(), buffer);
+        }
+        catch(const error::Error& e)
+        {
+            message_.reset();
+            promise_->reject(e);
+            promise_.reset();
+            return;
+        }
+    }
+    else
+    {
+        message_->insertPayload(buffer);
+    }
+
+    if(recentFrameType_ == FrameType::BULK || recentFrameType_ == FrameType::LAST)
+    {
+        promise_->resolve(std::move(message_));
+        promise_.reset();
+    }
+    else
+    {
+        auto transportPromise = transport::ITransport::ReceivePromise::defer(strand_);
+        transportPromise->then(
+            [this, self = this->shared_from_this()](common::Data data) mutable {
+                this->receiveFrameHeaderHandler(common::DataConstBuffer(data));
+            },
+            [this, self = this->shared_from_this()](const error::Error& e) mutable {
+                message_.reset();
+                promise_->reject(e);
+                promise_.reset();
+            });
+
+        transport_->receive(FrameHeader::getSizeOf(), std::move(transportPromise));
+    }
+}'''
+
+new_payload_handler = '''void MessageInStream::receiveFramePayloadHandler(const common::DataConstBuffer& buffer)
+{
+    Message::Pointer currentMessage = pendingMessages_.at(currentChannelId_);
+
+    if(currentMessage->getEncryptionType() == EncryptionType::ENCRYPTED)
+    {
+        try
+        {
+            cryptor_->decrypt(currentMessage->getPayload(), buffer);
+        }
+        catch(const error::Error& e)
+        {
+            pendingMessages_.erase(currentChannelId_);
+            promise_->reject(e);
+            promise_.reset();
+            return;
+        }
+    }
+    else
+    {
+        currentMessage->insertPayload(buffer);
+    }
+
+    if(recentFrameType_ == FrameType::BULK || recentFrameType_ == FrameType::LAST)
+    {
+        pendingMessages_.erase(currentChannelId_);
+        promise_->resolve(std::move(currentMessage));
+        promise_.reset();
+    }
+    else
+    {
+        auto transportPromise = transport::ITransport::ReceivePromise::defer(strand_);
+        transportPromise->then(
+            [this, self = this->shared_from_this()](common::Data data) mutable {
+                this->receiveFrameHeaderHandler(common::DataConstBuffer(data));
+            },
+            [this, self = this->shared_from_this()](const error::Error& e) mutable {
+                pendingMessages_.erase(currentChannelId_);
+                promise_->reject(e);
+                promise_.reset();
+            });
+
+        transport_->receive(FrameHeader::getSizeOf(), std::move(transportPromise));
+    }
+}'''
+
+assert old_payload_handler in content, 'receiveFramePayloadHandler not found — aasdk source may have changed upstream'
+content = content.replace(old_payload_handler, new_payload_handler)
+
+with open(path, 'w') as f:
+    f.write(content)
+print('aasdk MessageInStream patched OK')
+"
+
 cd aasdk
 mkdir -p build && cd build
 cmake .. \
@@ -451,8 +695,8 @@ EnableTouchscreen=true
 AdapterType=0
 [Audio]
 OutputBackendType=1
-MusicAudioChannelEnabled=false
-SpeechAudioChannelEnabled=false
+MusicAudioChannelEnabled=true
+SpeechAudioChannelEnabled=true
 EOF
 success "Config written to $AUTOAPP_WORKDIR/openauto.ini (the file openauto.service's autoapp actually reads)"
 
