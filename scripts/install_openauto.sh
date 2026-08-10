@@ -133,6 +133,246 @@ git clone --depth=1 https://github.com/f1xpl/openauto.git
 
 info "Patching openauto for Boost 1.70+ compatibility..."
 find openauto -type f -name "*.cpp" -exec sed -i 's/get_io_service()/context()/g' {} +
+
+info "Patching openauto for HeadUnit OS display handover + reconnect + ping keepalive..."
+# Three behavioral changes on top of vanilla f1xpl/openauto, reconstructed
+# 2026-08-09 after the original hand-patched checkout was lost with no
+# backup (see memory: openauto-deployed-source-lost). Keep this patch here
+# — in the repo, not as an ephemeral device-local checkout — so it is never
+# lost again.
+python3 -c "
+import re
+
+app_cpp = 'openauto/src/autoapp/App.cpp'
+with open(app_cpp) as f:
+    content = f.read()
+
+if '#include <cstdlib>' not in content:
+    content = content.replace(
+        'along with openauto. If not, see <http://www.gnu.org/licenses/>.\n*/',
+        'along with openauto. If not, see <http://www.gnu.org/licenses/>.\n*/\n#include <cstdlib>',
+        1)
+
+# 1) enumerateDevices(): pick up a phone that's already in AOAP accessory
+#    mode at startup instead of only reacting to a fresh USB hotplug event —
+#    needed because openauto.service starts on demand, after the phone may
+#    have already been switched into accessory mode.
+old_enum = '''void App::enumerateDevices()
+{
+    auto promise = aasdk::usb::IConnectedAccessoriesEnumerator::Promise::defer(strand_);
+    promise->then([this, self = this->shared_from_this()](auto result) {
+            OPENAUTO_LOG(info) << \"[App] Devices enumeration result: \" << result;
+        },
+        [this, self = this->shared_from_this()](auto e) {
+            OPENAUTO_LOG(error) << \"[App] Devices enumeration failed: \" << e.what();
+        });
+
+    connectedAccessoriesEnumerator_->enumerate(std::move(promise));
+}'''
+new_enum = '''void App::enumerateDevices()
+{
+    OPENAUTO_LOG(info) << \"[App] Checking for already connected AOAP accessories...\";
+
+    auto promise = aasdk::usb::IConnectedAccessoriesEnumerator::Promise::defer(strand_);
+    promise->then([this, self = this->shared_from_this()](auto result) {
+            OPENAUTO_LOG(info) << \"[App] Devices enumeration result: \" << result;
+
+            if(result && androidAutoEntity_ == nullptr)
+            {
+                OPENAUTO_LOG(info) << \"[App] Found existing connected AOAP accessory! Connecting immediately...\";
+
+                auto deviceHandle = usbWrapper_.openDeviceWithVidPid(0x18D1, 0x2D00);
+                if(deviceHandle == nullptr)
+                {
+                    deviceHandle = usbWrapper_.openDeviceWithVidPid(0x18D1, 0x2D01);
+                }
+
+                if(deviceHandle != nullptr)
+                {
+                    OPENAUTO_LOG(info) << \"[App] Successfully opened existing AOAP accessory handle!\";
+                    this->aoapDeviceHandler(std::move(deviceHandle));
+                }
+            }
+        },
+        [this, self = this->shared_from_this()](auto e) {
+            OPENAUTO_LOG(error) << \"[App] Devices enumeration failed: \" << e.what();
+        });
+
+    connectedAccessoriesEnumerator_->enumerate(std::move(promise));
+}'''
+assert old_enum in content, 'enumerateDevices() pattern not found — openauto source may have changed upstream'
+content = content.replace(old_enum, new_enum)
+
+# 2) onAndroidAutoQuit(): exit the process immediately on disconnect instead
+#    of looping back to wait for another device. autoapp deadlocking inside
+#    a graceful QApplication::quit() previously left headunit.service unable
+#    to reclaim the display on unplug — quick_exit sidesteps that entirely.
+old_quit = '''void App::onAndroidAutoQuit()
+{
+    strand_.dispatch([this, self = this->shared_from_this()]() {
+        OPENAUTO_LOG(info) << \"[App] quit.\";
+
+        androidAutoEntity_->stop();
+        androidAutoEntity_.reset();
+
+        if(!isStopped_)
+        {
+            this->waitForDevice();
+        }
+    });
+}'''
+new_quit = '''void App::onAndroidAutoQuit()
+{
+    strand_.dispatch([this, self = this->shared_from_this()]() {
+        OPENAUTO_LOG(info) << \"[App] Phone disconnected. Exiting immediately to restore HeadUnit OS...\";
+
+        androidAutoEntity_->stop();
+        androidAutoEntity_.reset();
+
+        std::quick_exit(0);
+    });
+}'''
+assert old_quit in content, 'onAndroidAutoQuit() pattern not found — openauto source may have changed upstream'
+content = content.replace(old_quit, new_quit)
+
+# 3) onUSBHubError(): same immediate-exit reasoning as above, for the USB
+#    hub error path.
+old_err = '''void App::onUSBHubError(const aasdk::error::Error& error)
+{
+    OPENAUTO_LOG(error) << \"[App] usb hub error: \" << error.what();
+
+    if(error != aasdk::error::ErrorCode::OPERATION_ABORTED &&
+       error != aasdk::error::ErrorCode::OPERATION_IN_PROGRESS)
+    {
+        this->waitForDevice();
+    }
+}'''
+new_err = '''void App::onUSBHubError(const aasdk::error::Error& error)
+{
+    OPENAUTO_LOG(error) << \"[App] usb hub error: \" << error.what();
+
+    if(error != aasdk::error::ErrorCode::OPERATION_ABORTED &&
+       error != aasdk::error::ErrorCode::OPERATION_IN_PROGRESS)
+    {
+        OPENAUTO_LOG(info) << \"[App] USB error - exiting immediately to restore HeadUnit OS...\";
+        std::quick_exit(0);
+    }
+}'''
+assert old_err in content, 'onUSBHubError() pattern not found — openauto source may have changed upstream'
+content = content.replace(old_err, new_err)
+
+with open(app_cpp, 'w') as f:
+    f.write(content)
+
+# 4) sendPing(): PingRequest.timestamp was never set (always 0). Modern
+#    Android Auto clients silently stop answering unstamped pings after a
+#    grace period, killing sessions at a consistent ~60s with 'ping timer
+#    exceeded' even though the USB transport stays healthy the whole time
+#    (confirmed via usbmon capture). f1xpl/openauto PR #185 made the same
+#    fix independently in 2020 (never merged, unrelated to why it was
+#    rejected).
+entity_cpp = 'openauto/src/autoapp/Service/AndroidAutoEntity.cpp'
+with open(entity_cpp) as f:
+    content = f.read()
+
+if '#include <chrono>' not in content:
+    content = content.replace(
+        '#include <f1x/openauto/Common/Log.hpp>',
+        '#include <f1x/openauto/Common/Log.hpp>\n#include <chrono>',
+        1)
+
+old_ping = '''void AndroidAutoEntity::sendPing()
+{
+    auto promise = aasdk::channel::SendPromise::defer(strand_);
+    promise->then([]() {}, std::bind(&AndroidAutoEntity::onChannelError, this->shared_from_this(), std::placeholders::_1));
+
+    aasdk::proto::messages::PingRequest request;
+    controlServiceChannel_->sendPingRequest(request, std::move(promise));
+}'''
+new_ping = '''void AndroidAutoEntity::sendPing()
+{
+    auto promise = aasdk::channel::SendPromise::defer(strand_);
+    promise->then([]() {}, std::bind(&AndroidAutoEntity::onChannelError, this->shared_from_this(), std::placeholders::_1));
+
+    auto timestamp = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch());
+
+    aasdk::proto::messages::PingRequest request;
+    request.set_timestamp(timestamp.count());
+    controlServiceChannel_->sendPingRequest(request, std::move(promise));
+}'''
+assert old_ping in content, 'sendPing() pattern not found — openauto source may have changed upstream'
+content = content.replace(old_ping, new_ping)
+
+with open(entity_cpp, 'w') as f:
+    f.write(content)
+
+# 5) autoapp.cpp: size MainWindow to the real screen before making it
+#    fullscreen. MainWindow.ui is Qt-Designer-authored at a fixed 800x480
+#    with absolutely-positioned children (no layout manager). Under Qt's
+#    eglfs platform (no window manager), showFullScreen() alone does not
+#    reliably resize a window that combines Qt::WindowStaysOnTopHint with
+#    an explicit small Designer geometry — it stays pinned at 800x480 in
+#    the corner of the real display instead of filling it.
+main_cpp = 'openauto/src/autoapp/autoapp.cpp'
+with open(main_cpp) as f:
+    content = f.read()
+
+if '#include <QScreen>' not in content:
+    content = content.replace('#include <QApplication>', '#include <QApplication>\n#include <QScreen>', 1)
+
+old_mw = '''    autoapp::ui::MainWindow mainWindow;
+    mainWindow.setWindowFlags(Qt::WindowStaysOnTopHint);'''
+new_mw = '''    autoapp::ui::MainWindow mainWindow;
+    mainWindow.setWindowFlags(Qt::WindowStaysOnTopHint);
+    mainWindow.setGeometry(QGuiApplication::primaryScreen()->geometry());'''
+assert old_mw in content, 'autoapp.cpp MainWindow setup pattern not found — openauto source may have changed upstream'
+content = content.replace(old_mw, new_mw)
+
+# 6) autoapp.cpp: never show MainWindow at all. This is a headless kiosk
+#    deployment — connect/disconnect is driven entirely by systemd + the
+#    HeadUnit OS Flutter app, nobody interacts with this window's
+#    Settings/Wireless/Exit buttons, and showing it just flashes an
+#    unwanted \"Waiting for device\" screen during every display handover.
+old_show = '''    mainWindow.showFullScreen();'''
+new_show = '''    mainWindow.hide();'''
+assert old_show in content, 'mainWindow.showFullScreen() line not found — openauto source may have changed upstream'
+content = content.replace(old_show, new_show)
+
+with open(main_cpp, 'w') as f:
+    f.write(content)
+
+# 7) QtVideoOutput.cpp: same screen-geometry-before-fullscreen fix as (5),
+#    applied to the actual AA video widget (a separate top-level window
+#    from MainWindow, also WindowStaysOnTopHint) — otherwise the video
+#    content itself stays pinned to its small default size even once
+#    MainWindow itself is sized/hidden correctly.
+video_cpp = 'openauto/src/autoapp/Projection/QtVideoOutput.cpp'
+with open(video_cpp) as f:
+    content = f.read()
+
+if '#include <QScreen>' not in content:
+    content = content.replace('#include <QApplication>', '#include <QApplication>\n#include <QScreen>', 1)
+
+old_vw = '''    videoWidget_->setAspectRatioMode(Qt::IgnoreAspectRatio);
+    videoWidget_->setFocus();
+    videoWidget_->setWindowFlags(Qt::WindowStaysOnTopHint);
+    videoWidget_->setFullScreen(true);
+    videoWidget_->show();'''
+new_vw = '''    videoWidget_->setAspectRatioMode(Qt::IgnoreAspectRatio);
+    videoWidget_->setFocus();
+    videoWidget_->setWindowFlags(Qt::WindowStaysOnTopHint);
+    videoWidget_->setGeometry(QGuiApplication::primaryScreen()->geometry());
+    videoWidget_->setFullScreen(true);
+    videoWidget_->show();'''
+assert old_vw in content, 'QtVideoOutput.cpp onStartPlayback pattern not found — openauto source may have changed upstream'
+content = content.replace(old_vw, new_vw)
+
+with open(video_cpp, 'w') as f:
+    f.write(content)
+
+print('openauto custom patches applied OK')
+"
+
 cd openauto
 mkdir -p build && cd build
 cmake .. \
@@ -163,13 +403,47 @@ success "openauto installed — binary at $INSTALL_PREFIX/bin/autoapp"
 
 # ── 4. OpenAuto configuration ─────────────────────────────────────────────────
 info "Step 4/6 — Writing OpenAuto configuration..."
+# openauto's Configuration class reads/writes a plain "openauto.ini" using a
+# RELATIVE path (src/autoapp/Configuration/Configuration.cpp), resolved
+# against the process's current working directory — i.e. openauto.service's
+# WorkingDirectory (scripts/install_wired_aa.sh sets this to the kiosk
+# user's $HOME). $CONFIG_DIR/openauto_properties.cfg below is NOT the file
+# the app actually reads; it's kept only for the operator to see the values
+# in one place. The real section/key names also differ from what you might
+# guess (discovered 2026-08-09 chasing a "video renders at 800x480 in the
+# corner" bug): [Video] Resolution=3 means 1080p (aasdk's VideoResolution
+# enum: 1=480p, 2=720p, 3=1080p), FPS=2 means 60fps (VideoFPS enum: 1=30,
+# 2=60) — these are NOT pixel dimensions or literal fps numbers.
+AUTOAPP_WORKDIR="$HOME"
+cat > "$AUTOAPP_WORKDIR/openauto.ini" << EOF
+[General]
+HandednessOfTrafficType=0
+ShowClock=true
+[Video]
+FPS=2
+Resolution=3
+ScreenDPI=140
+OMXLayerIndex=1
+MarginWidth=0
+MarginHeight=0
+[Input]
+EnableTouchscreen=true
+[Bluetooth]
+AdapterType=0
+[Audio]
+OutputBackendType=1
+MusicAudioChannelEnabled=false
+SpeechAudioChannelEnabled=false
+EOF
+success "Config written to $AUTOAPP_WORKDIR/openauto.ini (the file openauto.service's autoapp actually reads)"
+
 mkdir -p "$CONFIG_DIR"
 cat > "$CONFIG_DIR/openauto_properties.cfg" << EOF
 [Main]
 WirelessEnabled=true
 WirelessPort=${AA_WIRELESS_PORT}
-VideoWidth=1280
-VideoHeight=720
+VideoWidth=1920
+VideoHeight=1080
 VideoFPS=60
 VideoCodec=H264
 VideoOutputPort=${AA_VIDEO_PORT}
@@ -177,9 +451,8 @@ AudioPort=5557
 AudioOutputBackend=pulseaudio
 BluetoothEnabled=true
 BluetoothServiceName=${BT_ALIAS}
-TouchStdin=true
 EOF
-success "Config written to $CONFIG_DIR/openauto_properties.cfg"
+success "Reference copy written to $CONFIG_DIR/openauto_properties.cfg (informational only, not read by autoapp)"
 
 # ── 5. Wi-Fi hotspot profile (nmcli) ─────────────────────────────────────────
 info "Step 5/6 — Creating Wi-Fi hotspot profile (nmcli)..."
