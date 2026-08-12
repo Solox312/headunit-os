@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name "headunit_carrier")(type "KiCad")(uri "${KIPRJMOD}/headunit_carrier.pretty")(options "")(descr "HeadUnit OS carrier board project footprints"))
+)
