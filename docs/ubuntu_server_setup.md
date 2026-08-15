@@ -10,9 +10,9 @@
 | :--- | :--- |
 | **Document Title** | HeadUnit OS — Ubuntu Server Installation & Commissioning Manual |
 | **Document Type** | Technical Manual / Information for Use (IFU) |
-| **Document Identifier** | HUOS-IFU-002-REV-B |
-| **Revision** | B (Option C Native Android Auto Protocol Engine Edition) |
-| **Issue Date** | 2026-08-08 |
+| **Document Identifier** | HUOS-IFU-002-REV-C |
+| **Revision** | C (Master Platform Installer Edition) |
+| **Issue Date** | 2026-08-15 |
 | **Applies to Product** | HeadUnit OS — Dedicated Automotive Touchscreen Appliance |
 | **Target OS** | Ubuntu Server 22.04 LTS / 24.04 LTS (x86_64 or ARM64) |
 | **Target Audience** | Automotive Electronics Installers, Developers, System Integrators |
@@ -158,10 +158,15 @@ sudo usermod -aG plugdev,input,video,render,dialout $USER
 ## 7. Auto-Boot Kiosk Service Configuration
 
 ### Option A — Automated One-Command Setup (Recommended)
-Run the automated Ubuntu kiosk setup script to install dependencies, build the release bundle, set up system permissions, and launch kiosk mode:
+Run the automated master installer tool to install system dependencies, download/compile the kiosk engine, register hardware-specific shutdown listener daemons, set up system permissions, and enable kiosk mode:
 
 ```bash
-./scripts/setup_ubuntu_kiosk.sh
+# Launch interactive installation:
+./scripts/install_huos.sh
+
+# Or run silently for a specific target hardware:
+# For Raspberry Pi Dev: ./scripts/install_huos.sh --target pi
+# For Custom Carrier Board PROD: ./scripts/install_huos.sh --target prod
 ```
 
 ---
@@ -234,3 +239,4 @@ System control commands via SSH:
 | :--- | :--- | :--- | :--- |
 | A | 2026-08-08 | Initial Ubuntu Server DRM/KMS Installation Guide | HeadUnit OS Team |
 | B | 2026-08-08 | Transitioned to Native Android Auto Protocol Engine (Option C) | HeadUnit OS Team |
+| C | 2026-08-15 | Swapped old scripts for master installer tool scripts/install_huos.sh | HeadUnit OS Team |

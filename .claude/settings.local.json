@@ -21,7 +21,7 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(grep *)",
       "Bash(bash -n \"C:\\\\Users\\\\cnieves.wmg\\\\Desktop\\\\Projects\\\\headunit-os\\\\scripts\\\\install_openauto.sh\")",
-      "Bash(bash -n \"C:\\\\Users\\\\cnieves.wmg\\\\Desktop\\\\Projects\\\\headunit-os\\\\scripts\\\\setup_ubuntu_kiosk.sh\")"
+      "Bash(bash -n \"C:\\\\Users\\\\cnieves.wmg\\\\Desktop\\\\Projects\\\\headunit-os\\\\scripts\\\\install_huos.sh\")"
     ]
   }
 }
