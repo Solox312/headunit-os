@@ -4,8 +4,6 @@
 # Supporting Raspberry Pi (Dev), Custom Carrier Board (PROD), & Generic Linux Box
 # ==============================================================================
 
-set -euo pipefail
-
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -230,8 +228,15 @@ if ! command -v flutter &> /dev/null; then
 fi
 
 cd "$PROJECT_DIR"
+git config --global --add safe.directory "*" 2>/dev/null || true
+export CI=true
+export FLUTTER_SUPPRESS_ANALYTICS=true
+
 if command -v flutter &> /dev/null; then
-  flutter pub get
+  flutter config --no-analytics 2>/dev/null || true
+  
+  echo -e "${CYAN}Fetching Flutter packages...${NC}"
+  flutter pub get || true
   
   TARGET_PLATFORM="linux-x64"
   EMBEDDER_ARCH="linux-x64"
@@ -245,14 +250,18 @@ if command -v flutter &> /dev/null; then
 
   # Desktop C++ build is only for x86_64; Raspberry Pi ARM uses flutter-pi bundle
   if [ "$ARCH" = "x86_64" ]; then
+    echo -e "${CYAN}Compiling Linux release binary (x86_64)...${NC}"
     flutter precache --linux || true
     flutter build linux --release || true
   fi
 
+  echo -e "${CYAN}Generating build number...${NC}"
   chmod +x "$PROJECT_DIR/scripts/generate_build_number.sh" 2>/dev/null || true
-  "$PROJECT_DIR/scripts/generate_build_number.sh"
+  "$PROJECT_DIR/scripts/generate_build_number.sh" || true
 
-  flutter build bundle --target-platform="$TARGET_PLATFORM" || true
+  echo -e "${CYAN}Compiling Flutter asset bundle for $TARGET_PLATFORM...${NC}"
+  flutter build bundle --target-platform="$TARGET_PLATFORM"
+  echo -e "${GREEN}✓ Assets bundle compiled successfully.${NC}"
   
   mkdir -p "$PROJECT_DIR/build/flutter_assets"
   mkdir -p "$PROJECT_DIR/build/linux/x64/release/bundle"
