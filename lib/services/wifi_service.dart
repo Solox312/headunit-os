@@ -19,8 +19,23 @@ class WifiConnectResult {
 class WifiService {
   static final WifiService _instance = WifiService._internal();
   factory WifiService() => _instance;
+  
   WifiService._internal() {
     _disableApAutoconnect();
+  }
+
+  bool? _isNmcliAvailableCache;
+
+  /// Private helper to run nmcli commands with automatic fallback to sudo if Polkit denies authorization.
+  Future<ProcessResult> _runNmcli(List<String> args) async {
+    ProcessResult result = await Process.run('nmcli', args);
+    if (result.exitCode != 0 && result.stderr.toString().contains('Not authorized to control networking')) {
+      if (kDebugMode) {
+        print('[WifiService] nmcli ${args.join(' ')} unauthorized by Polkit. Retrying via sudo...');
+      }
+      result = await Process.run('sudo', ['nmcli', ...args]);
+    }
+    return result;
   }
 
   /// Proactively disables autoconnect and deletes any client profile for the local AP.
@@ -28,24 +43,22 @@ class WifiService {
     if (await isNmcliAvailable()) {
       try {
         // Delete the connection profile to make sure NetworkManager never tries to connect
-        await Process.run('nmcli', ['connection', 'delete', 'RPi_HeadUnit_5G']);
+        await _runNmcli(['connection', 'delete', 'RPi_HeadUnit_5G']);
         
         // If the interface is currently connected to the local AP, force disconnect
-        final statusResult = await Process.run('nmcli', ['-t', '-f', 'ACTIVE,SSID,DEVICE', 'dev', 'wifi']);
+        final statusResult = await _runNmcli(['-t', '-f', 'ACTIVE,SSID,DEVICE', 'dev', 'wifi']);
         if (statusResult.exitCode == 0) {
           for (var line in statusResult.stdout.toString().split('\n')) {
             final parts = line.split(':');
             if (parts.length >= 3 && parts[1].trim() == 'RPi_HeadUnit_5G' && (parts[0].trim() == 'yes' || parts[0].trim() == '*')) {
               final dev = parts[2].trim();
-              await Process.run('nmcli', ['device', 'disconnect', dev]);
+              await _runNmcli(['device', 'disconnect', dev]);
             }
           }
         }
       } catch (_) {}
     }
   }
-
-  bool? _isNmcliAvailableCache;
 
   /// Check if NetworkManager (`nmcli`) CLI tool is available on this system.
   Future<bool> isNmcliAvailable() async {
@@ -68,7 +81,7 @@ class WifiService {
   Future<bool> isWifiRadioOn() async {
     if (!await isNmcliAvailable()) return true; // Mock default
     try {
-      final result = await Process.run('nmcli', ['radio', 'wifi']);
+      final result = await _runNmcli(['radio', 'wifi']);
       if (result.exitCode == 0) {
         return result.stdout.toString().trim().toLowerCase() == 'enabled';
       }
@@ -82,7 +95,7 @@ class WifiService {
   Future<bool> setWifiRadio(bool enabled) async {
     if (!await isNmcliAvailable()) return true;
     try {
-      final result = await Process.run('nmcli', ['radio', 'wifi', enabled ? 'on' : 'off']);
+      final result = await _runNmcli(['radio', 'wifi', enabled ? 'on' : 'off']);
       return result.exitCode == 0;
     } catch (e) {
       if (kDebugMode) print('[WifiService] Error setting radio state: $e');
@@ -98,7 +111,7 @@ class WifiService {
 
     try {
       // Run nmcli scan with rescan
-      ProcessResult result = await Process.run('nmcli', [
+      ProcessResult result = await _runNmcli([
         '-t',
         '-f',
         'SSID,SIGNAL,SECURITY,IN-USE,BSSID',
@@ -115,7 +128,7 @@ class WifiService {
         if (kDebugMode) {
           print('[WifiService] nmcli list --rescan yes failed: ${result.stderr}. Falling back to cached list...');
         }
-        result = await Process.run('nmcli', [
+        result = await _runNmcli([
           '-t',
           '-f',
           'SSID,SIGNAL,SECURITY,IN-USE,BSSID',
@@ -174,13 +187,7 @@ class WifiService {
         args.addAll(['password', password]);
       }
 
-      ProcessResult result = await Process.run('nmcli', args);
-
-      // Automatic fallback retry via sudo nmcli if unprivileged nmcli returns Polkit authorization error
-      if (result.exitCode != 0 && result.stderr.toString().contains('Not authorized to control networking')) {
-        if (kDebugMode) print('[WifiService] Standard nmcli unauthorized by Polkit. Retrying via sudo nmcli...');
-        result = await Process.run('sudo', ['nmcli', ...args]);
-      }
+      ProcessResult result = await _runNmcli(args);
 
       if (result.exitCode == 0) {
         if (kDebugMode) print('[WifiService] Successfully connected to $ssid');
@@ -216,7 +223,7 @@ class WifiService {
     if (!await isNmcliAvailable()) return true;
 
     try {
-      final devResult = await Process.run('nmcli', ['-t', '-f', 'DEVICE,TYPE', 'dev']);
+      final devResult = await _runNmcli(['-t', '-f', 'DEVICE,TYPE', 'dev']);
       String wifiDev = 'wlan0';
       if (devResult.exitCode == 0) {
         for (var line in devResult.stdout.toString().split('\n')) {
@@ -228,7 +235,7 @@ class WifiService {
         }
       }
 
-      final result = await Process.run('nmcli', ['dev', 'disconnect', wifiDev]);
+      final result = await _runNmcli(['dev', 'disconnect', wifiDev]);
       return result.exitCode == 0;
     } catch (e) {
       if (kDebugMode) print('[WifiService] Disconnect exception: $e');
@@ -248,7 +255,7 @@ class WifiService {
     }
 
     try {
-      final result = await Process.run('nmcli', ['-t', '-f', 'ACTIVE,SSID,DEVICE', 'dev', 'wifi']);
+      final result = await _runNmcli(['-t', '-f', 'ACTIVE,SSID,DEVICE', 'dev', 'wifi']);
       if (result.exitCode == 0) {
         for (var line in result.stdout.toString().split('\n')) {
           final parts = line.split(':');
@@ -280,7 +287,7 @@ class WifiService {
 
   Future<String> _getDeviceIp(String device) async {
     try {
-      final result = await Process.run('nmcli', ['-t', '-f', 'IP4.ADDRESS', 'dev', 'show', device]);
+      final result = await _runNmcli(['-t', '-f', 'IP4.ADDRESS', 'dev', 'show', device]);
       if (result.exitCode == 0 && result.stdout.toString().trim().isNotEmpty) {
         final line = result.stdout.toString().split('\n').first;
         final ipWithCidr = line.split(':').last.trim();
