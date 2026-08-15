@@ -19,7 +19,18 @@ class WifiConnectResult {
 class WifiService {
   static final WifiService _instance = WifiService._internal();
   factory WifiService() => _instance;
-  WifiService._internal();
+  WifiService._internal() {
+    _disableApAutoconnect();
+  }
+
+  /// Proactively disables autoconnect for the local AP profile if NetworkManager created one.
+  void _disableApAutoconnect() async {
+    if (await isNmcliAvailable()) {
+      try {
+        await Process.run('nmcli', ['connection', 'modify', 'RPi_HeadUnit_5G', 'connection.autoconnect', 'no']);
+      } catch (_) {}
+    }
+  }
 
   bool? _isNmcliAvailableCache;
 
@@ -254,7 +265,7 @@ class WifiService {
     if (parts.length < 4) return null;
 
     final ssid = parts[0].trim();
-    if (ssid.isEmpty) return null;
+    if (ssid.isEmpty || ssid == 'RPi_HeadUnit_5G') return null;
 
     final signal = int.tryParse(parts[1].trim()) ?? 50;
     final security = parts[2].trim().isEmpty ? 'Open' : parts[2].trim();
