@@ -232,10 +232,7 @@ fi
 cd "$PROJECT_DIR"
 if command -v flutter &> /dev/null; then
   flutter pub get
-  flutter precache --linux || true
-  flutter build linux --release || true
-  chmod +x "$PROJECT_DIR/scripts/generate_build_number.sh" 2>/dev/null || true
-  "$PROJECT_DIR/scripts/generate_build_number.sh"
+  
   TARGET_PLATFORM="linux-x64"
   EMBEDDER_ARCH="linux-x64"
   if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
@@ -245,6 +242,15 @@ if command -v flutter &> /dev/null; then
     TARGET_PLATFORM="linux-arm"
     EMBEDDER_ARCH="linux-arm"
   fi
+
+  # Desktop C++ build is only for x86_64; Raspberry Pi ARM uses flutter-pi bundle
+  if [ "$ARCH" = "x86_64" ]; then
+    flutter precache --linux || true
+    flutter build linux --release || true
+  fi
+
+  chmod +x "$PROJECT_DIR/scripts/generate_build_number.sh" 2>/dev/null || true
+  "$PROJECT_DIR/scripts/generate_build_number.sh"
 
   flutter build bundle --target-platform="$TARGET_PLATFORM" || true
   

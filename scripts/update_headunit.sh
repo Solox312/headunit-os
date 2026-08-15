@@ -47,7 +47,9 @@ elif [[ "$ARCH" == "armv7l" || "$ARCH" == "armhf" ]]; then
 fi
 
 # Build complete release bundle and asset bundle
-flutter build linux --release || true
+if [ "$ARCH" = "x86_64" ]; then
+  flutter build linux --release || true
+fi
 flutter build bundle --target-platform="$TARGET_PLATFORM" || true
 
 # Copy compiled AOT libapp.so to app.so in assets directories (necessary for flutter-pi release mode)
