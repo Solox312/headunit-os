@@ -213,10 +213,21 @@ if command -v flutter &> /dev/null; then
   flutter build linux --release || true
   chmod +x "$PROJECT_DIR/scripts/generate_build_number.sh" 2>/dev/null || true
   "$PROJECT_DIR/scripts/generate_build_number.sh"
-  flutter build bundle --target-platform=linux-x64
+  TARGET_PLATFORM="linux-x64"
+  EMBEDDER_ARCH="linux-x64"
+  if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+    TARGET_PLATFORM="linux-arm64"
+    EMBEDDER_ARCH="linux-arm64"
+  elif [[ "$ARCH" == "armv7l" || "$ARCH" == "armhf" ]]; then
+    TARGET_PLATFORM="linux-arm"
+    EMBEDDER_ARCH="linux-arm"
+  fi
+
+  flutter build bundle --target-platform="$TARGET_PLATFORM" || true
   
   mkdir -p "$PROJECT_DIR/build/flutter_assets"
   mkdir -p "$PROJECT_DIR/build/linux/x64/release/bundle"
+  mkdir -p "$PROJECT_DIR/build/linux/arm64/release/bundle"
 
   ICU_LOCATIONS=$(find "$PROJECT_DIR/build" "$HOME" "/tmp" "/snap" -name "icudtl.dat" 2>/dev/null || true)
   ICU_FILE=$(echo "$ICU_LOCATIONS" | head -n 1)
@@ -225,30 +236,38 @@ if command -v flutter &> /dev/null; then
     echo "Found icudtl.dat at $ICU_FILE"
     cp "$ICU_FILE" "$PROJECT_DIR/build/flutter_assets/icudtl.dat" 2>/dev/null || true
     cp "$ICU_FILE" "$PROJECT_DIR/build/linux/x64/release/bundle/icudtl.dat" 2>/dev/null || true
+    cp "$ICU_FILE" "$PROJECT_DIR/build/linux/arm64/release/bundle/icudtl.dat" 2>/dev/null || true
     if [ -d "$PROJECT_DIR/build/linux/x64/release/bundle/data/flutter_assets" ]; then
       cp "$ICU_FILE" "$PROJECT_DIR/build/linux/x64/release/bundle/data/flutter_assets/icudtl.dat" 2>/dev/null || true
     fi
+    if [ -d "$PROJECT_DIR/build/linux/arm64/release/bundle/data/flutter_assets" ]; then
+      cp "$ICU_FILE" "$PROJECT_DIR/build/linux/arm64/release/bundle/data/flutter_assets/icudtl.dat" 2>/dev/null || true
+    fi
   fi
 
-  echo -e "${CYAN}Downloading official AOT release libflutter_engine.so from Google Storage...${NC}"
+  echo -e "${CYAN}Downloading official AOT release libflutter_engine.so ($EMBEDDER_ARCH) from Google Storage...${NC}"
   ENGINE_REV="5a2a6a42cce67f965cf540fcecf616faca624aa1"
   FOUND_REV=$(cat $(which flutter 2>/dev/null | xargs readlink -f 2>/dev/null | xargs dirname 2>/dev/null | xargs dirname 2>/dev/null)/bin/internal/engine.version 2>/dev/null || echo "")
   if [ -n "$FOUND_REV" ]; then
     ENGINE_REV="$FOUND_REV"
   fi
-  curl -sSL "https://storage.googleapis.com/flutter_infra_release/flutter/${ENGINE_REV}/linux-x64/linux-x64-embedder.zip" -o /tmp/flutter_embedder.zip || true
+  curl -sSL "https://storage.googleapis.com/flutter_infra_release/flutter/${ENGINE_REV}/${EMBEDDER_ARCH}/${EMBEDDER_ARCH}-embedder.zip" -o /tmp/flutter_embedder.zip || true
   if [ -f /tmp/flutter_embedder.zip ]; then
     unzip -o -q /tmp/flutter_embedder.zip -d /tmp/flutter_embedder
     cp /tmp/flutter_embedder/libflutter_engine.so "$PROJECT_DIR/build/flutter_assets/" 2>/dev/null || true
     cp /tmp/flutter_embedder/libflutter_engine.so "$PROJECT_DIR/build/linux/x64/release/bundle/" 2>/dev/null || true
+    cp /tmp/flutter_embedder/libflutter_engine.so "$PROJECT_DIR/build/linux/arm64/release/bundle/" 2>/dev/null || true
     if [ -d "$PROJECT_DIR/build/linux/x64/release/bundle/lib" ]; then
       cp /tmp/flutter_embedder/libflutter_engine.so "$PROJECT_DIR/build/linux/x64/release/bundle/lib/" 2>/dev/null || true
+    fi
+    if [ -d "$PROJECT_DIR/build/linux/arm64/release/bundle/lib" ]; then
+      cp /tmp/flutter_embedder/libflutter_engine.so "$PROJECT_DIR/build/linux/arm64/release/bundle/lib/" 2>/dev/null || true
     fi
     sudo cp /tmp/flutter_embedder/libflutter_engine.so /usr/lib/libflutter_engine.so 2>/dev/null || true
     sudo cp /tmp/flutter_embedder/libflutter_engine.so /usr/local/lib/libflutter_engine.so 2>/dev/null || true
     sudo ldconfig 2>/dev/null || true
     rm -rf /tmp/flutter_embedder /tmp/flutter_embedder.zip
-    echo -e "${GREEN}✓ Release libflutter_engine.so installed to system and bundle libraries.${NC}"
+    echo -e "${GREEN}✓ Release libflutter_engine.so ($EMBEDDER_ARCH) installed to system and bundle libraries.${NC}"
   fi
 
   # Copy compiled AOT libapp.so to app.so in assets directories (necessary for flutter-pi release mode)
