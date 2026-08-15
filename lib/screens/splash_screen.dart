@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/automotive_colors.dart';
 import '../services/settings_storage_service.dart';
+import '../version.dart';
 import 'onboarding_screen.dart';
 import 'main_navigation_screen.dart';
 
@@ -212,11 +213,33 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                // Dynamic System Version & Build Tag
+                Text(
+                  _formatVersion(buildVersion),
+                  style: GoogleFonts.shareTechMono(
+                    color: AutomotiveColors.textSecondary.withValues(alpha: 0.5),
+                    fontSize: 11,
+                    letterSpacing: 1.5,
+                  ),
+                ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _formatVersion(String ver) {
+    try {
+      final parts = ver.split('+');
+      if (parts.length == 2) {
+        return 'HEADUNIT OS v${parts[0]} • BUILD ${parts[1]}';
+      }
+      return 'HEADUNIT OS v$ver';
+    } catch (_) {
+      return 'HEADUNIT OS v1.0.0 (Build 1)';
+    }
   }
 }
