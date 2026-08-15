@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
 # HeadUnit OS — Master Platform Installer & Provisioning Tool
-# Supporting Raspberry Pi (Dev) & Custom Carrier Board (PROD - Radxa CM3S)
+# Supporting Raspberry Pi (Dev), Custom Carrier Board (PROD), & Generic Linux Box
 # ==============================================================================
 
 set -euo pipefail
@@ -33,10 +33,10 @@ TARGET=""
 while [[ $# -gt 0 ]]; do
   case $1 in
     -t|--target)
-      if [[ "$2" == "pi" || "$2" == "prod" ]]; then
+      if [[ "$2" == "pi" || "$2" == "prod" || "$2" == "generic" ]]; then
         TARGET="$2"
       else
-        echo -e "${RED}Error: Invalid target '$2'. Must be 'pi' or 'prod'.${NC}"
+        echo -e "${RED}Error: Invalid target '$2'. Must be 'pi', 'prod', or 'generic'.${NC}"
         exit 1
       fi
       shift 2
@@ -53,11 +53,13 @@ if [ -z "$TARGET" ]; then
   echo -e "${CYAN}Select the target hardware platform:${NC}"
   echo "  1) Raspberry Pi (Dev)"
   echo "  2) Custom Carrier Board (PROD)"
+  echo "  3) Generic Linux PC / VM / Dev Box"
   echo ""
-  read -p "Enter selection [1-2]: " choice
+  read -p "Enter selection [1-3]: " choice
   case $choice in
     1) TARGET="pi" ;;
     2) TARGET="prod" ;;
+    3) TARGET="generic" ;;
     *)
       echo -e "${RED}Invalid selection. Aborting.${NC}"
       exit 1
@@ -68,18 +70,20 @@ fi
 echo ""
 if [ "$TARGET" == "pi" ]; then
   echo -e "👉 Selected Target: ${GREEN}Raspberry Pi (Dev)${NC}"
-else
+elif [ "$TARGET" == "prod" ]; then
   echo -e "👉 Selected Target: ${GREEN}Custom Carrier Board (PROD)${NC}"
+else
+  echo -e "👉 Selected Target: ${GREEN}Generic Linux PC / VM / Dev Box${NC}"
 fi
 echo ""
 
 # ── 2. Safety / Workstation Guard ────────────────────────────────────────────
-if [ "$ARCH" = "x86_64" ]; then
-  echo -e "${YELLOW}⚠️  WARNING: You are running this installer on an x86_64 workstation.${NC}"
+if [ "$ARCH" = "x86_64" ] && [ "$TARGET" != "generic" ]; then
+  echo -e "${YELLOW}⚠️  WARNING: You are running a dedicated kiosk installer on an x86_64 workstation.${NC}"
   echo "   This script sets the system default boot target to multi-user.target (headless console),"
   echo "   which will disable your desktop GUI on next reboot."
   echo ""
-  read -p "Are you sure you want to proceed with installing systemd services here? [y/N]: " confirm
+  read -p "Are you sure you want to proceed with installing kiosk services here? [y/N]: " confirm
   if [[ ! "$confirm" =~ ^[yY](es)?$ ]]; then
     echo "Installation aborted by user."
     exit 0
@@ -106,7 +110,7 @@ sudo apt install -y "${CORE_PACKAGES[@]}"
 if [ "$TARGET" == "pi" ]; then
   echo -e "${CYAN}Installing gpiozero for Raspberry Pi...${NC}"
   sudo apt install -y python3-gpiozero
-else
+elif [ "$TARGET" == "prod" ]; then
   echo -e "${CYAN}Installing libgpiod for Custom Carrier Board...${NC}"
   sudo apt install -y python3-libgpiod
 fi
@@ -187,15 +191,16 @@ fi
 echo ""
 
 # ── 6. Deploy Safe Shutdown Daemon ────────────────────────────────────────────
-echo -e "${CYAN}[4/6] Installing safe shutdown service...${NC}"
-SHUTDOWN_SCRIPT=""
-if [ "$TARGET" == "pi" ]; then
-  SHUTDOWN_SCRIPT="$PROJECT_DIR/scripts/shutdown_listener.py"
-else
-  SHUTDOWN_SCRIPT="$PROJECT_DIR/scripts/shutdown_listener_carrier.py"
-fi
+if [ "$TARGET" != "generic" ]; then
+  echo -e "${CYAN}[4/6] Installing safe shutdown service...${NC}"
+  SHUTDOWN_SCRIPT=""
+  if [ "$TARGET" == "pi" ]; then
+    SHUTDOWN_SCRIPT="$PROJECT_DIR/scripts/shutdown_listener.py"
+  else
+    SHUTDOWN_SCRIPT="$PROJECT_DIR/scripts/shutdown_listener_carrier.py"
+  fi
 
-sudo tee /etc/systemd/system/car-shutdown.service > /dev/null << EOF
+  sudo tee /etc/systemd/system/car-shutdown.service > /dev/null << EOF
 [Unit]
 Description=Automotive Safe Shutdown Service for HeadUnit OS
 After=network.target
@@ -210,10 +215,13 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-sudo systemctl daemon-reload
-sudo systemctl enable car-shutdown.service
-sudo systemctl restart car-shutdown.service
-echo -e "${GREEN}✓ Safe shutdown daemon installed and started.${NC}"
+  sudo systemctl daemon-reload
+  sudo systemctl enable car-shutdown.service
+  sudo systemctl restart car-shutdown.service
+  echo -e "${GREEN}✓ Safe shutdown daemon installed and started.${NC}"
+else
+  echo -e "${CYAN}[4/6] Skipping safe shutdown service (Generic Linux target)...${NC}"
+fi
 echo ""
 
 # ── 7. Install & Start Systemd Kiosk Service ─────────────────────────────────
@@ -291,7 +299,7 @@ EOF
   else
     echo "⚠️  Skipping boot config edits (no config.txt found)."
   fi
-else
+elif [ "$TARGET" == "prod" ]; then
   # PROD Board - Warn about OverlayFS requirement
   echo -e "${YELLOW}⚠️  PROD BOARD CONFIGURATION REMINDER:${NC}"
   echo "   Since the custom carrier board runs off USB-C PD power, a hard unplug"
@@ -300,6 +308,8 @@ else
   echo "   OverlayFS (Read-Only Mode) in your OS settings (e.g. raspi-config"
   echo "   or Radxa Config utility) before deploying to vehicle dashboard."
   echo ""
+else
+  echo -e "${GREEN}✓ Generic Linux boot config: No adjustments needed.${NC}"
 fi
 
 # Add current user to plugdev group for USB accessory access
