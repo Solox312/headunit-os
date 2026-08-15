@@ -145,6 +145,8 @@ if command -v flutter &> /dev/null; then
   flutter pub get
   flutter precache --linux || true
   flutter build linux --release || true
+  chmod +x "$PROJECT_DIR/scripts/generate_build_number.sh" 2>/dev/null || true
+  "$PROJECT_DIR/scripts/generate_build_number.sh"
   flutter build bundle --target-platform=linux-x64
   
   mkdir -p "$PROJECT_DIR/build/flutter_assets"

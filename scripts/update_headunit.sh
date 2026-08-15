@@ -35,6 +35,8 @@ echo ""
 
 # 3. Rebuild Bundle
 echo -e "${CYAN}[3/4] Rebuilding HeadUnit OS bundle...${NC}"
+chmod +x "$PROJECT_DIR/scripts/generate_build_number.sh" 2>/dev/null || true
+"$PROJECT_DIR/scripts/generate_build_number.sh"
 flutter build bundle --target-platform=linux-x64
 
 # Copy icudtl.dat into flutter_assets if needed

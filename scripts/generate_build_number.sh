@@ -1,0 +1,43 @@
+#!/bin/bash
+# ==============================================================================
+# HeadUnit OS — Build Number Generator & Pubspec Updater
+# Automatically calculates build number from Git commit count or increments it.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PUBSPEC_FILE="$PROJECT_DIR/pubspec.yaml"
+
+if [ ! -f "$PUBSPEC_FILE" ]; then
+  echo "Error: pubspec.yaml not found at $PUBSPEC_FILE"
+  exit 1
+fi
+
+# 1. Calculate Build Number (using Git commit count as auto-incrementing build number)
+if command -v git &> /dev/null && git rev-parse --is-inside-work-tree &> /dev/null; then
+  BUILD_NUMBER=$(git rev-list --count HEAD)
+  echo "Calculated build number from Git history: $BUILD_NUMBER"
+else
+  # Fallback: read current build number and increment by 1
+  CURRENT_VERSION_LINE=$(grep "^version:" "$PUBSPEC_FILE")
+  # Extract the build number after the '+'
+  CURRENT_BUILD=$(echo "$CURRENT_VERSION_LINE" | cut -d'+' -f2)
+  BUILD_NUMBER=$((CURRENT_BUILD + 1))
+  echo "Git not available. Incremented cached build number: $BUILD_NUMBER"
+fi
+
+# 2. Read Current Version Name (prefix before '+')
+CURRENT_VERSION_LINE=$(grep "^version:" "$PUBSPEC_FILE")
+VERSION_NAME=$(echo "$CURRENT_VERSION_LINE" | cut -d':' -f2 | tr -d ' ' | cut -d'+' -f1)
+
+NEW_VERSION_LINE="version: ${VERSION_NAME}+${BUILD_NUMBER}"
+
+# 3. Update pubspec.yaml
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  sed -i '' "s/^version:.*/$NEW_VERSION_LINE/" "$PUBSPEC_FILE"
+else
+  sed -i "s/^version:.*/$NEW_VERSION_LINE/" "$PUBSPEC_FILE"
+fi
+
+echo "Successfully updated version in pubspec.yaml to: $NEW_VERSION_LINE"
