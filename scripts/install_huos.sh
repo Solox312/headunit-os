@@ -262,6 +262,7 @@ Group=$CURRENT_USER
 WorkingDirectory=$PROJECT_DIR
 Environment=XDG_RUNTIME_DIR=/tmp/flutter-pi-runtime
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=LD_LIBRARY_PATH=$PROJECT_DIR/build/linux/x64/release/bundle/lib:$PROJECT_DIR/build/linux/x64/release/bundle:$ASSETS_PATH
 ExecStartPre=/bin/mkdir -p /tmp/flutter-pi-runtime
 ExecStart=/usr/local/bin/flutter-pi $FLUTTER_PI_FLAGS $ASSETS_PATH
 Restart=always
