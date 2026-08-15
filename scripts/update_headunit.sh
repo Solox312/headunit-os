@@ -37,11 +37,15 @@ echo ""
 echo -e "${CYAN}[3/4] Rebuilding HeadUnit OS bundle...${NC}"
 chmod +x "$PROJECT_DIR/scripts/generate_build_number.sh" 2>/dev/null || true
 "$PROJECT_DIR/scripts/generate_build_number.sh"
-flutter build bundle --target-platform=linux-x64
 
-# Copy icudtl.dat into flutter_assets if needed
+# Build complete release bundle (AOT compiles libapp.so for flutter-pi)
+flutter build linux --release
+
+# Copy icudtl.dat to appropriate build folders if found
 ICU_FILE=$(find "$PROJECT_DIR/build" "$HOME" "/tmp" "/snap" -name "icudtl.dat" 2>/dev/null | head -n 1 || true)
 if [ -n "$ICU_FILE" ]; then
+  cp "$ICU_FILE" "$PROJECT_DIR/build/linux/x64/release/bundle/icudtl.dat" 2>/dev/null || true
+  mkdir -p "$PROJECT_DIR/build/flutter_assets"
   cp "$ICU_FILE" "$PROJECT_DIR/build/flutter_assets/icudtl.dat" 2>/dev/null || true
 fi
 echo -e "${GREEN}✓ Assets bundle rebuilt.${NC}"

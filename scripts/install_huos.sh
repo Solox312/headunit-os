@@ -230,12 +230,12 @@ echo ""
 echo -e "${CYAN}[5/6] Installing /etc/systemd/system/headunit.service...${NC}"
 
 ASSETS_PATH="$PROJECT_DIR/build/flutter_assets"
-if [ ! -d "$ASSETS_PATH" ] && [ -d "$PROJECT_DIR/build/linux/x64/release/bundle" ]; then
+if [ -d "$PROJECT_DIR/build/linux/x64/release/bundle" ]; then
   ASSETS_PATH="$PROJECT_DIR/build/linux/x64/release/bundle"
 fi
 
 FLUTTER_PI_FLAGS=""
-if [ -f "$ASSETS_PATH/app.so" ] || [ -f "$ASSETS_PATH/lib/libapp.so" ]; then
+if [ -f "$ASSETS_PATH/app.so" ] || [ -f "$ASSETS_PATH/lib/libapp.so" ] || [ -f "$ASSETS_PATH/data/flutter_assets/app.so" ]; then
   FLUTTER_PI_FLAGS="--release"
 fi
 
