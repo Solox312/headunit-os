@@ -8,7 +8,7 @@ is unchanged and still Raspberry-Pi-specific.
 
 ## Safe-shutdown daemon
 
-- [ ] **(Critical) Shorten the shutdown hold-off for the carrier board.** `shutdown_listener.py`
+- [x] **(Critical) Shorten the shutdown hold-off for the carrier board.** `shutdown_listener.py`
       currently uses `gpiozero.Button(..., hold_time=3)` — a 3-second continuous-signal
       requirement before calling `shutdown -h now`, tuned to ride out engine-cranking voltage
       sag on the RPi/HAT track. On the carrier board, the only energy reserve after USB-C VBUS
@@ -20,7 +20,7 @@ is unchanged and still Raspberry-Pi-specific.
       failure mode it's guarding against is a brief USB-C connector bounce, not multi-second
       engine-cranking sag — that's already handled by the hardware RC debounce
       (R3 10k / C7 10µF, ~100ms-class).
-- [ ] Write a carrier-board-specific version of the shutdown daemon. The current script is
+- [x] Write a carrier-board-specific version of the shutdown daemon. The current script is
       Raspberry-Pi-only: `gpiozero`, BCM pin numbering, hardcoded `IGNITION_PIN = 26`. The
       RK3566/RK3568 SoM needs a different GPIO access method (e.g. `libgpiod`/`gpiod` Python
       bindings) and a different pin identifier — Rockchip GPIOs are addressed by
@@ -34,7 +34,7 @@ is unchanged and still Raspberry-Pi-specific.
 - [ ] Once real hardware exists: bench-verify the actual VBUS-loss-to-brownout holdup time and
       set the software hold-off to match with margin — the 470µF bump in this revision is a
       starting estimate, not a measured value (see the BOM/design-doc notes).
-- [ ] Consider renaming ignition-specific language in the new script/logs ("ignition loss",
+- [x] Consider renaming ignition-specific language in the new script/logs ("ignition loss",
       `IGNITION_PIN`) to power-loss language, since there's no ignition switch in this signal
       path anymore — purely cosmetic/clarity, not functional. Leave the existing RPi-track
       script's ignition language alone; it's still accurate for that build.
