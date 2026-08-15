@@ -305,6 +305,14 @@ fi
 # Add current user to plugdev group for USB accessory access
 sudo usermod -aG plugdev "$CURRENT_USER" || true
 
+# Configure passwordless sudo for core utilities needed by HeadUnit OS UI settings and daemons
+echo "⚡ Configuring passwordless sudo rules for HeadUnit OS services..."
+sudo tee /etc/sudoers.d/headunit-os > /dev/null << 'EOF'
+# HeadUnit OS passwordless controls for plugdev group
+%plugdev ALL=(ALL) NOPASSWD: /usr/bin/nmcli, /usr/sbin/reboot, /usr/sbin/shutdown, /usr/sbin/poweroff, /usr/bin/systemctl
+EOF
+sudo chmod 0440 /etc/sudoers.d/headunit-os
+
 echo ""
 echo -e "${GREEN}==============================================================================${NC}"
 echo -e "${GREEN}🎉 HeadUnit OS Provisioning Complete!${NC}"

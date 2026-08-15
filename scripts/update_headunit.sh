@@ -23,6 +23,7 @@ cd "$PROJECT_DIR"
 # 1. Pull Latest Changes
 echo -e "${CYAN}[1/4] Pulling latest repository updates...${NC}"
 git pull
+chmod +x "$PROJECT_DIR/scripts/install_huos.sh" 2>/dev/null || true
 echo -e "${GREEN}✓ Git repository up to date.${NC}"
 echo ""
 
