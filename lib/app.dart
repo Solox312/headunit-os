@@ -8,6 +8,7 @@ import 'models/media_item.dart';
 import 'providers/projection_provider.dart';
 import 'providers/wifi_provider.dart';
 import 'providers/bluetooth_provider.dart';
+import 'providers/update_provider.dart';
 import 'providers/fm_transmitter_provider.dart';
 import 'providers/display_provider.dart';
 import 'providers/keyboard_provider.dart';
@@ -36,6 +37,10 @@ class RpiHeadunitApp extends StatelessWidget {
         // user ever opens the projection screen.
         ChangeNotifierProvider(create: (_) => ProjectionProvider(), lazy: false),
         ChangeNotifierProvider(create: (_) => WifiProvider()),
+        ChangeNotifierProvider(
+          create: (context) => UpdateProvider(context.read<WifiProvider>()),
+          lazy: false,
+        ),
         ChangeNotifierProvider(
           create: (context) {
             final bt = BluetoothProvider();

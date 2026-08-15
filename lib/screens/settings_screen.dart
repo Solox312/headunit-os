@@ -10,6 +10,7 @@ import '../providers/display_provider.dart';
 import '../providers/keyboard_provider.dart';
 import '../services/system_info_service.dart';
 import '../models/wifi_network.dart';
+import '../providers/update_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -232,6 +233,421 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 4),
           const Divider(color: AutomotiveColors.strokeSoft, height: 1),
+        ],
+      ),
+    );
+  }
+
+  void _showUpdateLogsModal(BuildContext context, UpdateProvider update) {
+    final scrollController = ScrollController();
+
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: AutomotiveColors.panelDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Consumer<UpdateProvider>(
+          builder: (context, up, child) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (scrollController.hasClients) {
+                scrollController.jumpTo(scrollController.position.maxScrollExtent);
+              }
+            });
+
+            return Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.terminal_rounded, color: AutomotiveColors.electricCyan),
+                      const SizedBox(width: 10),
+                      Text(
+                        up.isDownloading ? "Downloading Update Package..." : "Applying System Update...",
+                        style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  if (up.isDownloading) ...[
+                    LinearProgressIndicator(
+                      value: up.downloadProgress,
+                      backgroundColor: Colors.black.withAlpha(80),
+                      color: AutomotiveColors.electricCyan,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      "Downloading bundle... ${(up.downloadProgress * 100).toStringAsFixed(0)}%",
+                      style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 12),
+                    ),
+                  ],
+                  if (up.isApplying || up.updateLogs.isNotEmpty) ...[
+                    Text(
+                      "INSTALLATION LOGS",
+                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: AutomotiveColors.textSecondary),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      height: 180,
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withAlpha(150),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AutomotiveColors.stroke, width: 1.0),
+                      ),
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: up.updateLogs.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2.0),
+                            child: Text(
+                              up.updateLogs[index],
+                              style: GoogleFonts.jetBrainsMono(
+                                color: up.updateLogs[index].toLowerCase().contains("error") 
+                                    ? AutomotiveColors.redAccent 
+                                    : (up.updateLogs[index].toLowerCase().contains("success") || up.updateLogs[index].startsWith("✓"))
+                                        ? AutomotiveColors.nativeGreen
+                                        : AutomotiveColors.textPrimary,
+                                fontSize: 11,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (up.errorMessage != null) ...[
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: Text("Close", style: GoogleFonts.inter(color: AutomotiveColors.redAccent, fontWeight: FontWeight.bold)),
+                        ),
+                      ] else if (up.updateSuccess) ...[
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AutomotiveColors.nativeGreen,
+                            foregroundColor: Colors.black,
+                          ),
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            _showRebootConfirmDialog(context, up);
+                          },
+                          icon: const Icon(Icons.restart_alt_rounded),
+                          label: Text("Reboot to Apply", style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                        ),
+                      ] else ...[
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AutomotiveColors.electricCyan),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          up.isDownloading ? "Downloading..." : "Installing assets...",
+                          style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 12),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showRebootConfirmDialog(BuildContext context, UpdateProvider update) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AutomotiveColors.glassPanel,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AutomotiveColors.stroke, width: 1.0),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.restart_alt_rounded, color: AutomotiveColors.nativeGreen),
+              const SizedBox(width: 10),
+              Text(
+                "System Reboot Required",
+                style: GoogleFonts.spaceGrotesk(color: AutomotiveColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Text(
+            "The update bundle has been successfully extracted. Restart the system to finalize the changes and launch the new version of HeadUnit OS.",
+            style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 13),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AutomotiveColors.electricCyan,
+                foregroundColor: Colors.black,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                update.triggerReboot();
+              },
+              child: Text("Reboot Now", style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildUpdateCard(BuildContext context, UpdateProvider update) {
+    final wifi = context.watch<WifiProvider>();
+
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.system_update_rounded, color: AutomotiveColors.electricCyan),
+                  const SizedBox(width: 10),
+                  Text(
+                    "System Update",
+                    style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
+                  ),
+                ],
+              ),
+              if (update.isChecking)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AutomotiveColors.electricCyan),
+                )
+              else
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded, color: AutomotiveColors.electricCyan),
+                  onPressed: wifi.isConnected ? () => update.checkForUpdates() : null,
+                  tooltip: "Check for Updates",
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          if (!wifi.isConnected) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AutomotiveColors.orangeAccent.withAlpha(20),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AutomotiveColors.orangeAccent.withAlpha(100)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.wifi_off_rounded, color: AutomotiveColors.orangeAccent, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "Connect to a Wi-Fi network to check for and download system updates.",
+                      style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            if (update.isUpdateAvailable) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AutomotiveColors.electricCyan.withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AutomotiveColors.electricCyan.withAlpha(100)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded, color: AutomotiveColors.electricCyan, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "New Update Available: v${update.remoteVersion}",
+                            style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "CHANGELOG / RELEASES:",
+                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: AutomotiveColors.textSecondary),
+                    ),
+                    const SizedBox(height: 4),
+                    ...update.changelog.map((change) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 4.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("• ", style: TextStyle(color: AutomotiveColors.electricCyan)),
+                          Expanded(
+                            child: Text(
+                              change,
+                              style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              if (update.isOverlayFsActive) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AutomotiveColors.orangeAccent.withAlpha(20),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AutomotiveColors.orangeAccent.withAlpha(120)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: AutomotiveColors.orangeAccent, size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "OverlayFS Read-Only Mode Active",
+                              style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              "Updates made while OverlayFS is active will be lost on reboot. Temporarily disable OverlayFS in performance settings (raspi-config), reboot, perform the update, and re-enable it.",
+                              style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Text("Simulate OverlayFS", style: GoogleFonts.inter(color: AutomotiveColors.textMuted, fontSize: 11)),
+                      const SizedBox(width: 4),
+                      SizedBox(
+                        height: 20,
+                        width: 36,
+                        child: Switch(
+                          value: update.isOverlayFsActive,
+                          activeTrackColor: AutomotiveColors.orangeAccent,
+                          onChanged: (val) => update.toggleSimulateOverlayFs(val),
+                        ),
+                      ),
+                    ],
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AutomotiveColors.electricCyan,
+                      foregroundColor: Colors.black,
+                    ),
+                    onPressed: () async {
+                      _showUpdateLogsModal(context, update);
+                      await update.startUpdateFlow();
+                    },
+                    icon: const Icon(Icons.system_update_alt_rounded),
+                    label: Text("Update Now", style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  const Icon(Icons.check_circle_outline_rounded, color: AutomotiveColors.nativeGreen, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "System is up-to-date",
+                          style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Text(
+                          "Last checked: ${wifi.isConnected ? 'Just now' : 'No connection'}",
+                          style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (update.errorMessage != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  update.errorMessage!,
+                  style: GoogleFonts.inter(color: AutomotiveColors.redAccent, fontSize: 12),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Text("Simulate OverlayFS", style: GoogleFonts.inter(color: AutomotiveColors.textMuted, fontSize: 11)),
+                      const SizedBox(width: 4),
+                      SizedBox(
+                        height: 20,
+                        width: 36,
+                        child: Switch(
+                          value: update.isOverlayFsActive,
+                          activeTrackColor: AutomotiveColors.orangeAccent,
+                          onChanged: (val) => update.toggleSimulateOverlayFs(val),
+                        ),
+                      ),
+                    ],
+                  ),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AutomotiveColors.electricCyan,
+                      side: const BorderSide(color: AutomotiveColors.electricCyan),
+                    ),
+                    onPressed: () => update.checkForUpdates(),
+                    child: Text("Check Now", style: GoogleFonts.inter(fontSize: 12)),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ],
       ),
     );
@@ -884,6 +1300,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  // System Update Card
+                  Consumer<UpdateProvider>(
+                    builder: (context, update, child) {
+                      return _buildUpdateCard(context, update);
+                    },
                   ),
                   const SizedBox(height: 12),
                   // System Information & Diagnostics Card
