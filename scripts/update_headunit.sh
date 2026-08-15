@@ -44,6 +44,7 @@ flutter build linux --release
 # Copy compiled AOT libapp.so to app.so in assets directories (necessary for flutter-pi release mode)
 if [ -f "$PROJECT_DIR/build/linux/x64/release/bundle/lib/libapp.so" ]; then
   cp "$PROJECT_DIR/build/linux/x64/release/bundle/lib/libapp.so" "$PROJECT_DIR/build/linux/x64/release/bundle/data/flutter_assets/app.so" 2>/dev/null || true
+  cp "$PROJECT_DIR/build/linux/x64/release/bundle/lib/libapp.so" "$PROJECT_DIR/build/linux/x64/release/bundle/app.so" 2>/dev/null || true
   mkdir -p "$PROJECT_DIR/build/flutter_assets"
   cp "$PROJECT_DIR/build/linux/x64/release/bundle/lib/libapp.so" "$PROJECT_DIR/build/flutter_assets/app.so" 2>/dev/null || true
 fi
