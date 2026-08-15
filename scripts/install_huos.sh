@@ -26,12 +26,76 @@ echo -e "  Project Path: ${GREEN}${PROJECT_DIR}${NC}"
 echo -e "  Architecture: ${GREEN}${ARCH}${NC}"
 echo ""
 
+# ── Uninstallation Handler ──────────────────────────────────────────────────
+run_uninstall() {
+  echo -e "${YELLOW}╔══════════════════════════════════════════════════════════════╗${NC}"
+  echo -e "${YELLOW}║           HeadUnit OS — System Uninstallation Tool           ║${NC}"
+  echo -e "${YELLOW}╚══════════════════════════════════════════════════════════════╝${NC}"
+  echo ""
+  echo "This tool will remove HeadUnit OS kiosk services and revert startup configs."
+  read -p "Are you sure you want to uninstall HeadUnit OS? [y/N]: " confirm
+  if [[ ! "$confirm" =~ ^[yY](es)?$ ]]; then
+    echo "Uninstallation cancelled."
+    exit 0
+  fi
+  echo ""
+
+  echo -e "${CYAN}[1/5] Stopping and disabling HeadUnit OS services...${NC}"
+  sudo systemctl stop headunit.service 2>/dev/null || true
+  sudo systemctl disable headunit.service 2>/dev/null || true
+  sudo systemctl stop car-shutdown.service 2>/dev/null || true
+  sudo systemctl disable car-shutdown.service 2>/dev/null || true
+  echo -e "${GREEN}✓ Services stopped and disabled.${NC}"
+
+  echo -e "${CYAN}[2/5] Removing systemd service units...${NC}"
+  sudo rm -f /etc/systemd/system/headunit.service
+  sudo rm -f /etc/systemd/system/car-shutdown.service
+  sudo systemctl daemon-reload
+  echo -e "${GREEN}✓ Systemd units removed.${NC}"
+
+  echo -e "${CYAN}[3/5] Restoring default system target and console logging...${NC}"
+  # Check if a display manager (gdm3, lightdm, sddm) exists, if so restore graphical.target
+  if systemctl list-unit-files 2>/dev/null | grep -E "gdm|lightdm|sddm" &>/dev/null; then
+    sudo systemctl set-default graphical.target 2>/dev/null || true
+    echo -e "${GREEN}✓ Restored system default to graphical.target (Desktop GUI).${NC}"
+  else
+    echo -e "${GREEN}✓ Retained default multi-user.target.${NC}"
+  fi
+  sudo rm -f /etc/sysctl.d/99-headunit-console.conf
+  sudo sysctl --system > /dev/null 2>&1 || true
+
+  echo -e "${CYAN}[4/5] Removing sudoers privileges & temporary runtime caches...${NC}"
+  sudo rm -f /etc/sudoers.d/headunit-os
+  rm -rf /tmp/flutter-pi-runtime
+  echo -e "${GREEN}✓ Privileges and runtime caches cleaned.${NC}"
+
+  echo -e "${CYAN}[5/5] Reverting boot configs (if present)...${NC}"
+  for cfg in /boot/firmware/config.txt /boot/config.txt; do
+    if [ -f "$cfg" ] && grep -q "HeadUnit OS Fast Boot" "$cfg" 2>/dev/null; then
+      sudo sed -i '/# HeadUnit OS Fast Boot/,+4d' "$cfg" 2>/dev/null || true
+      echo -e "${GREEN}✓ Removed Fast Boot config from $cfg.${NC}"
+    fi
+  done
+
+  echo ""
+  echo -e "${GREEN}==============================================================================${NC}"
+  echo -e "${GREEN}🎉 HeadUnit OS has been completely uninstalled.${NC}"
+  echo "You may now safely delete this project folder or reboot your system:"
+  echo -e "   ${CYAN}sudo reboot${NC}"
+  echo -e "${GREEN}==============================================================================${NC}"
+  echo ""
+  exit 0
+}
+
 # ── 1. Target Hardware Selection ─────────────────────────────────────────────
 TARGET=""
 
 # Parse flags if provided
 while [[ $# -gt 0 ]]; do
   case $1 in
+    -u|--uninstall)
+      run_uninstall
+      ;;
     -t|--target)
       if [[ "$2" == "pi" || "$2" == "prod" || "$2" == "generic" ]]; then
         TARGET="$2"
@@ -50,16 +114,18 @@ done
 
 # Prompt interactively if target not specified by flags
 if [ -z "$TARGET" ]; then
-  echo -e "${CYAN}Select the target hardware platform:${NC}"
+  echo -e "${CYAN}Select the target hardware platform or action:${NC}"
   echo "  1) Raspberry Pi (Dev)"
   echo "  2) Custom Carrier Board (PROD)"
   echo "  3) Generic Linux PC / VM / Dev Box"
+  echo "  4) Uninstall / Remove HeadUnit OS Services"
   echo ""
-  read -p "Enter selection [1-3]: " choice
+  read -p "Enter selection [1-4]: " choice
   case $choice in
     1) TARGET="pi" ;;
     2) TARGET="prod" ;;
     3) TARGET="generic" ;;
+    4) run_uninstall ;;
     *)
       echo -e "${RED}Invalid selection. Aborting.${NC}"
       exit 1
