@@ -26,36 +26,40 @@ class WifiService {
 
   bool? _isNmcliAvailableCache;
 
-  /// Private helper to run nmcli commands with automatic fallback to sudo if Polkit denies authorization.
+  /// Private helper to run nmcli commands with automatic fallback to sudo if unprivileged execution fails.
   Future<ProcessResult> _runNmcli(List<String> args) async {
     ProcessResult result = await Process.run('nmcli', args);
-    if (result.exitCode != 0 && result.stderr.toString().contains('Not authorized to control networking')) {
+    if (result.exitCode != 0) {
       if (kDebugMode) {
-        print('[WifiService] nmcli ${args.join(' ')} unauthorized by Polkit. Retrying via sudo...');
+        print('[WifiService] nmcli ${args.join(' ')} failed (exitCode: ${result.exitCode}). Retrying via sudo...');
       }
       result = await Process.run('sudo', ['nmcli', ...args]);
     }
     return result;
   }
 
-  /// Proactively disables autoconnect and deletes any client profile for the local AP.
+  /// Proactively disables autoconnect, deletes client profiles for the local AP, and triggers a hardware scan.
   void _disableApAutoconnect() async {
     if (await isNmcliAvailable()) {
       try {
-        // Delete the connection profile to make sure NetworkManager never tries to connect
+        // Delete any local AP profiles to prevent loopbacks
         await _runNmcli(['connection', 'delete', 'RPi_HeadUnit_5G']);
+        await _runNmcli(['connection', 'delete', 'Hotspot']);
         
         // If the interface is currently connected to the local AP, force disconnect
         final statusResult = await _runNmcli(['-t', '-f', 'ACTIVE,SSID,DEVICE', 'dev', 'wifi']);
         if (statusResult.exitCode == 0) {
           for (var line in statusResult.stdout.toString().split('\n')) {
             final parts = line.split(':');
-            if (parts.length >= 3 && parts[1].trim() == 'RPi_HeadUnit_5G' && (parts[0].trim() == 'yes' || parts[0].trim() == '*')) {
+            if (parts.length >= 3 && (parts[1].trim() == 'RPi_HeadUnit_5G' || parts[1].trim() == 'Hotspot') && (parts[0].trim() == 'yes' || parts[0].trim() == '*')) {
               final dev = parts[2].trim();
               await _runNmcli(['device', 'disconnect', dev]);
             }
           }
         }
+
+        // Trigger an initial rescan to populate the cache immediately on boot
+        await _runNmcli(['dev', 'wifi', 'rescan']);
       } catch (_) {}
     }
   }
