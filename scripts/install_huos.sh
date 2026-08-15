@@ -259,13 +259,9 @@ if command -v flutter &> /dev/null; then
   chmod +x "$PROJECT_DIR/scripts/generate_build_number.sh" 2>/dev/null || true
   "$PROJECT_DIR/scripts/generate_build_number.sh" || true
 
-  if [ -f "$PROJECT_DIR/build/flutter_assets/kernel_blob.bin" ] && [ "$ARCH" != "x86_64" ]; then
-    echo -e "${GREEN}✓ Prebuilt assets bundle detected. Skipping local compilation.${NC}"
-  else
-    echo -e "${CYAN}Compiling Flutter asset bundle for $TARGET_PLATFORM...${NC}"
-    flutter build bundle --target-platform="$TARGET_PLATFORM" || true
-    echo -e "${GREEN}✓ Assets bundle compiled.${NC}"
-  fi
+  echo -e "${CYAN}Compiling local Flutter asset bundle ($TARGET_PLATFORM)...${NC}"
+  flutter build bundle --target-platform="$TARGET_PLATFORM"
+  echo -e "${GREEN}✓ Local assets bundle compiled successfully.${NC}"
   
   mkdir -p "$PROJECT_DIR/build/flutter_assets"
   mkdir -p "$PROJECT_DIR/build/linux/x64/release/bundle"
