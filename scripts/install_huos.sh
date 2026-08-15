@@ -204,8 +204,31 @@ else
 fi
 echo ""
 
-# ── 5. Build HeadUnit OS Bundle (Optional Dev Compilation) ─────────────────────
-echo -e "${CYAN}[3/6] Building HeadUnit OS release bundle...${NC}"
+# Check if Flutter SDK is in PATH or standard installation locations
+if ! command -v flutter &> /dev/null; then
+  if [ -x "/opt/flutter/bin/flutter" ]; then
+    export PATH="/opt/flutter/bin:$PATH"
+  elif [ -x "$HOME/flutter/bin/flutter" ]; then
+    export PATH="$HOME/flutter/bin:$PATH"
+  elif [ -x "$USER_HOME/flutter/bin/flutter" ]; then
+    export PATH="$USER_HOME/flutter/bin:$PATH"
+  elif [ -x "/snap/bin/flutter" ]; then
+    export PATH="/snap/bin:$PATH"
+  fi
+fi
+
+# If Flutter is still not found, automatically install it to /opt/flutter
+if ! command -v flutter &> /dev/null; then
+  echo -e "${CYAN}Flutter SDK not detected. Installing Flutter SDK to /opt/flutter for ${ARCH}...${NC}"
+  sudo git clone -b stable --depth 1 https://github.com/flutter/flutter.git /opt/flutter
+  sudo chown -R "$CURRENT_USER:$CURRENT_USER" /opt/flutter
+  export PATH="/opt/flutter/bin:$PATH"
+  if ! grep -q "/opt/flutter/bin" "$USER_HOME/.bashrc" 2>/dev/null; then
+    echo 'export PATH="/opt/flutter/bin:$PATH"' >> "$USER_HOME/.bashrc"
+  fi
+  echo -e "${GREEN}✓ Flutter SDK installed to /opt/flutter.${NC}"
+fi
+
 cd "$PROJECT_DIR"
 if command -v flutter &> /dev/null; then
   flutter pub get
