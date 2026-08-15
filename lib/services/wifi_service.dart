@@ -23,11 +23,24 @@ class WifiService {
     _disableApAutoconnect();
   }
 
-  /// Proactively disables autoconnect for the local AP profile if NetworkManager created one.
+  /// Proactively disables autoconnect and deletes any client profile for the local AP.
   void _disableApAutoconnect() async {
     if (await isNmcliAvailable()) {
       try {
-        await Process.run('nmcli', ['connection', 'modify', 'RPi_HeadUnit_5G', 'connection.autoconnect', 'no']);
+        // Delete the connection profile to make sure NetworkManager never tries to connect
+        await Process.run('nmcli', ['connection', 'delete', 'RPi_HeadUnit_5G']);
+        
+        // If the interface is currently connected to the local AP, force disconnect
+        final statusResult = await Process.run('nmcli', ['-t', '-f', 'ACTIVE,SSID,DEVICE', 'dev', 'wifi']);
+        if (statusResult.exitCode == 0) {
+          for (var line in statusResult.stdout.toString().split('\n')) {
+            final parts = line.split(':');
+            if (parts.length >= 3 && parts[1].trim() == 'RPi_HeadUnit_5G' && (parts[0].trim() == 'yes' || parts[0].trim() == '*')) {
+              final dev = parts[2].trim();
+              await Process.run('nmcli', ['device', 'disconnect', dev]);
+            }
+          }
+        }
       } catch (_) {}
     }
   }
@@ -223,6 +236,7 @@ class WifiService {
           final parts = line.split(':');
           if (parts.length >= 3 && (parts[0].trim() == 'yes' || parts[0].trim() == '*')) {
             final ssid = parts[1].trim();
+            if (ssid == 'RPi_HeadUnit_5G') continue; // Ignore local AP interface
             final dev = parts[2].trim();
             final ip = await _getDeviceIp(dev);
             return {
