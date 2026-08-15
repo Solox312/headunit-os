@@ -38,8 +38,9 @@ echo -e "${CYAN}[3/4] Rebuilding HeadUnit OS bundle...${NC}"
 chmod +x "$PROJECT_DIR/scripts/generate_build_number.sh" 2>/dev/null || true
 "$PROJECT_DIR/scripts/generate_build_number.sh"
 
-# Build complete release bundle (AOT compiles libapp.so for flutter-pi)
-flutter build linux --release
+# Build complete release bundle and asset bundle
+flutter build linux --release || true
+flutter build bundle --target-platform=linux-x64 || true
 
 # Copy compiled AOT libapp.so to app.so in assets directories (necessary for flutter-pi release mode)
 if [ -f "$PROJECT_DIR/build/linux/x64/release/bundle/lib/libapp.so" ]; then
