@@ -98,7 +98,7 @@ class WifiService {
 
     try {
       // Run nmcli scan with rescan
-      final result = await Process.run('nmcli', [
+      ProcessResult result = await Process.run('nmcli', [
         '-t',
         '-f',
         'SSID,SIGNAL,SECURITY,IN-USE,BSSID',
@@ -108,6 +108,24 @@ class WifiService {
         '--rescan',
         'yes'
       ]);
+
+      // If rescan fails (common on some platforms when AP mode is active or interface is busy),
+      // fallback to reading the cached Wi-Fi list without forcing a rescan.
+      if (result.exitCode != 0) {
+        if (kDebugMode) {
+          print('[WifiService] nmcli list --rescan yes failed: ${result.stderr}. Falling back to cached list...');
+        }
+        result = await Process.run('nmcli', [
+          '-t',
+          '-f',
+          'SSID,SIGNAL,SECURITY,IN-USE,BSSID',
+          'dev',
+          'wifi',
+          'list',
+          '--rescan',
+          'no'
+        ]);
+      }
 
       if (result.exitCode != 0) {
         if (kDebugMode) print('[WifiService] nmcli list failed: ${result.stderr}');
