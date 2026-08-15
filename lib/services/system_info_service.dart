@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../version.dart';
 
 class SystemInfoData {
   final String osVersion;
@@ -91,22 +92,10 @@ class SystemInfoService {
   }
 
   static Future<String> getAppVersionString() async {
-    try {
-      final pubspecFile = File('pubspec.yaml');
-      if (await pubspecFile.exists()) {
-        final lines = await pubspecFile.readAsLines();
-        for (var line in lines) {
-          if (line.trim().startsWith('version:')) {
-            final ver = line.split(':').last.trim(); // e.g. "1.0.0+1"
-            final parts = ver.split('+');
-            if (parts.length == 2) {
-              return "HeadUnit OS v${parts[0]} (Build ${parts[1]})";
-            }
-            return "HeadUnit OS v$ver";
-          }
-        }
-      }
-    } catch (_) {}
-    return "HeadUnit OS v1.0.0 (Build 1)";
+    final parts = buildVersion.split('+');
+    if (parts.length == 2) {
+      return "HeadUnit OS v${parts[0]} (Build ${parts[1]})";
+    }
+    return "HeadUnit OS v$buildVersion";
   }
 }
