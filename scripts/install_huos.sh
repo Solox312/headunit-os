@@ -184,6 +184,13 @@ if command -v flutter &> /dev/null; then
   else
     cp "$ENGINE_FILE" "$PROJECT_DIR/build/flutter_assets/" 2>/dev/null || true
   fi
+
+  # Copy compiled AOT libapp.so to app.so in assets directories (necessary for flutter-pi release mode)
+  if [ -f "$PROJECT_DIR/build/linux/x64/release/bundle/lib/libapp.so" ]; then
+    cp "$PROJECT_DIR/build/linux/x64/release/bundle/lib/libapp.so" "$PROJECT_DIR/build/linux/x64/release/bundle/data/flutter_assets/app.so" 2>/dev/null || true
+    cp "$PROJECT_DIR/build/linux/x64/release/bundle/lib/libapp.so" "$PROJECT_DIR/build/flutter_assets/app.so" 2>/dev/null || true
+  fi
+
   echo -e "${GREEN}✓ Local bundle compiled.${NC}"
 else
   echo -e "${YELLOW}ℹ️  Flutter SDK is not found. Skipping local bundle compilation.${NC}"

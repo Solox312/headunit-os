@@ -41,12 +41,22 @@ chmod +x "$PROJECT_DIR/scripts/generate_build_number.sh" 2>/dev/null || true
 # Build complete release bundle (AOT compiles libapp.so for flutter-pi)
 flutter build linux --release
 
+# Copy compiled AOT libapp.so to app.so in assets directories (necessary for flutter-pi release mode)
+if [ -f "$PROJECT_DIR/build/linux/x64/release/bundle/lib/libapp.so" ]; then
+  cp "$PROJECT_DIR/build/linux/x64/release/bundle/lib/libapp.so" "$PROJECT_DIR/build/linux/x64/release/bundle/data/flutter_assets/app.so" 2>/dev/null || true
+  mkdir -p "$PROJECT_DIR/build/flutter_assets"
+  cp "$PROJECT_DIR/build/linux/x64/release/bundle/lib/libapp.so" "$PROJECT_DIR/build/flutter_assets/app.so" 2>/dev/null || true
+fi
+
 # Copy icudtl.dat to appropriate build folders if found
 ICU_FILE=$(find "$PROJECT_DIR/build" "$HOME" "/tmp" "/snap" -name "icudtl.dat" 2>/dev/null | head -n 1 || true)
 if [ -n "$ICU_FILE" ]; then
   cp "$ICU_FILE" "$PROJECT_DIR/build/linux/x64/release/bundle/icudtl.dat" 2>/dev/null || true
   mkdir -p "$PROJECT_DIR/build/flutter_assets"
   cp "$ICU_FILE" "$PROJECT_DIR/build/flutter_assets/icudtl.dat" 2>/dev/null || true
+  if [ -d "$PROJECT_DIR/build/linux/x64/release/bundle/data/flutter_assets" ]; then
+    cp "$ICU_FILE" "$PROJECT_DIR/build/linux/x64/release/bundle/data/flutter_assets/icudtl.dat" 2>/dev/null || true
+  fi
 fi
 echo -e "${GREEN}✓ Assets bundle rebuilt.${NC}"
 echo ""
