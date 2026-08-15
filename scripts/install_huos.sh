@@ -164,25 +164,25 @@ if command -v flutter &> /dev/null; then
     fi
   fi
 
-  ENGINE_LOCATIONS=$(find "$PROJECT_DIR/build" "$HOME" "/tmp" "/snap" -name "libflutter_engine.so" 2>/dev/null || true)
-  ENGINE_FILE=$(echo "$ENGINE_LOCATIONS" | head -n 1)
-  
-  if [ -z "$ENGINE_FILE" ]; then
-    echo -e "${YELLOW}Downloading libflutter_engine.so direct from Google infra...${NC}"
-    ENGINE_REV="5a2a6a42cce67f965cf540fcecf616faca624aa1"
-    FOUND_REV=$(cat $(which flutter 2>/dev/null | xargs readlink -f 2>/dev/null | xargs dirname 2>/dev/null | xargs dirname 2>/dev/null)/bin/internal/engine.version 2>/dev/null || echo "")
-    if [ -n "$FOUND_REV" ]; then
-      ENGINE_REV="$FOUND_REV"
+  echo -e "${CYAN}Downloading official AOT release libflutter_engine.so from Google Storage...${NC}"
+  ENGINE_REV="5a2a6a42cce67f965cf540fcecf616faca624aa1"
+  FOUND_REV=$(cat $(which flutter 2>/dev/null | xargs readlink -f 2>/dev/null | xargs dirname 2>/dev/null | xargs dirname 2>/dev/null)/bin/internal/engine.version 2>/dev/null || echo "")
+  if [ -n "$FOUND_REV" ]; then
+    ENGINE_REV="$FOUND_REV"
+  fi
+  curl -sSL "https://storage.googleapis.com/flutter_infra_release/flutter/${ENGINE_REV}/linux-x64/linux-x64-embedder.zip" -o /tmp/flutter_embedder.zip || true
+  if [ -f /tmp/flutter_embedder.zip ]; then
+    unzip -o -q /tmp/flutter_embedder.zip -d /tmp/flutter_embedder
+    cp /tmp/flutter_embedder/libflutter_engine.so "$PROJECT_DIR/build/flutter_assets/" 2>/dev/null || true
+    cp /tmp/flutter_embedder/libflutter_engine.so "$PROJECT_DIR/build/linux/x64/release/bundle/" 2>/dev/null || true
+    if [ -d "$PROJECT_DIR/build/linux/x64/release/bundle/lib" ]; then
+      cp /tmp/flutter_embedder/libflutter_engine.so "$PROJECT_DIR/build/linux/x64/release/bundle/lib/" 2>/dev/null || true
     fi
-    curl -sSL "https://storage.googleapis.com/flutter_infra_release/flutter/${ENGINE_REV}/linux-x64/linux-x64-embedder.zip" -o /tmp/flutter_embedder.zip || true
-    if [ -f /tmp/flutter_embedder.zip ]; then
-      unzip -o -q /tmp/flutter_embedder.zip -d /tmp/flutter_embedder
-      cp /tmp/flutter_embedder/libflutter_engine.so "$PROJECT_DIR/build/flutter_assets/" 2>/dev/null || true
-      cp /tmp/flutter_embedder/libflutter_engine.so "$PROJECT_DIR/build/linux/x64/release/bundle/" 2>/dev/null || true
-      rm -rf /tmp/flutter_embedder /tmp/flutter_embedder.zip
-    fi
-  else
-    cp "$ENGINE_FILE" "$PROJECT_DIR/build/flutter_assets/" 2>/dev/null || true
+    sudo cp /tmp/flutter_embedder/libflutter_engine.so /usr/lib/libflutter_engine.so 2>/dev/null || true
+    sudo cp /tmp/flutter_embedder/libflutter_engine.so /usr/local/lib/libflutter_engine.so 2>/dev/null || true
+    sudo ldconfig 2>/dev/null || true
+    rm -rf /tmp/flutter_embedder /tmp/flutter_embedder.zip
+    echo -e "${GREEN}✓ Release libflutter_engine.so installed to system and bundle libraries.${NC}"
   fi
 
   # Copy compiled AOT libapp.so to app.so in assets directories (necessary for flutter-pi release mode)
@@ -325,8 +325,8 @@ else
   echo -e "${GREEN}✓ Generic Linux boot config: No adjustments needed.${NC}"
 fi
 
-# Add current user to plugdev group for USB accessory access
-sudo usermod -aG plugdev "$CURRENT_USER" || true
+# Add current user to essential hardware and accessory groups (DRM/GPU, touchscreen input, TTY, networking)
+sudo usermod -aG plugdev,video,render,input,tty,dialout "$CURRENT_USER" || true
 
 # Configure passwordless sudo for core utilities needed by HeadUnit OS UI settings and daemons
 echo "⚡ Configuring passwordless sudo rules for HeadUnit OS services..."
