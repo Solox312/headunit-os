@@ -426,15 +426,7 @@ old_enum = '''void App::enumerateDevices()
 }'''
 new_enum = '''void App::enumerateDevices()
 {
-    OPENAUTO_LOG(info) << \"[App] Checking for wireless and USB devices...\";
-
-    recentAddressesList_.read();
-    if(!recentAddressesList_.getList().empty())
-    {
-        OPENAUTO_LOG(info) << \"[App] Auto-connecting to wireless device: \" << recentAddressesList_.getList().front();
-        this->connectToDevice(recentAddressesList_.getList().front());
-        return;
-    }
+    OPENAUTO_LOG(info) << \"[App] Checking for already connected AOAP accessories...\";
 
     auto promise = aasdk::usb::IConnectedAccessoriesEnumerator::Promise::defer(strand_);
     promise->then([this, self = this->shared_from_this()](auto result) {
@@ -604,10 +596,36 @@ content = content.replace(old_mw, new_mw)
 #    HeadUnit OS Flutter app, nobody interacts with this window's
 #    Settings/Wireless/Exit buttons, and showing it just flashes an
 #    unwanted \"Waiting for device\" screen during every display handover.
-old_show = '''    mainWindow.showFullScreen();'''
-new_show = '''    mainWindow.hide();'''
-assert old_show in content, 'mainWindow.showFullScreen() line not found — openauto source may have changed upstream'
-content = content.replace(old_show, new_show)
+old_start = '''    QObject::connect(&connectDialog, &autoapp::ui::ConnectDialog::connectionSucceed, [&app](auto socket) {
+        app->start(std::move(socket));
+    });
+
+    app->waitForUSBDevice();'''
+new_start = '''    QObject::connect(&connectDialog, &autoapp::ui::ConnectDialog::connectionSucceed, [&app](auto socket) {
+        app->start(std::move(socket));
+    });
+
+    if(!recentAddressesList.getList().empty())
+    {
+        const std::string ipAddress = recentAddressesList.getList().front();
+        OPENAUTO_LOG(info) << "[autoapp] Auto-connecting wireless to: " << ipAddress;
+        auto socket = std::make_shared<boost::asio::ip::tcp::socket>(ioService);
+        tcpWrapper.asyncConnect(*socket, ipAddress, 50001, [&app, socket, ipAddress](const boost::system::error_code& ec) {
+            if(!ec)
+            {
+                OPENAUTO_LOG(info) << "[autoapp] Connected to wireless device at " << ipAddress;
+                app->start(std::move(socket));
+            }
+            else
+            {
+                OPENAUTO_LOG(error) << "[autoapp] Wireless connect failed: " << ec.message();
+            }
+        });
+    }
+
+    app->waitForUSBDevice();'''
+assert old_start in content, 'autoapp.cpp start pattern not found — openauto source may have changed upstream'
+content = content.replace(old_start, new_start)
 
 with open(main_cpp, 'w') as f:
     f.write(content)
