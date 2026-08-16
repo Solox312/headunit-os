@@ -372,7 +372,7 @@ def _connect_loop(device_path):
         candidates = _advertised_candidates(device_path)
         emit(f"PHONE_SEEN {device_path} candidates={','.join(candidates)}")
 
-        for attempt in range(1, 3):
+        for attempt in range(1, 4):
             for uuid in candidates:
                 with _lock:
                     if device_path in _active_devices:
@@ -380,19 +380,21 @@ def _connect_loop(device_path):
                 try:
                     device = dbus.Interface(_bus.get_object("org.bluez", device_path),
                                             "org.bluez.Device1")
-                    device.ConnectProfile(uuid, timeout=5)
+                    device.ConnectProfile(uuid, timeout=8)
                     emit(f"CONNECT_PROFILE_OK {device_path} uuid={uuid}")
                     return  # BlueZ delivers the fd via Profile1.NewConnection
                 except dbus.exceptions.DBusException as exc:
                     name = exc.get_dbus_name() or ""
                     if "AlreadyConnected" in name or "InProgress" in name:
+                        emit(f"CONNECT_PROFILE_ALREADY {device_path} uuid={uuid}")
                         return
-                    if "NotAvailable" in name or "not-supported" in str(exc).lower():
-                        # Phone does not host server profile — it will connect into our server channel
-                        break
+                    # Log ALL failures so we can see exact error
                     emit(f"CONNECT_ATTEMPT_FAILED attempt={attempt} uuid={uuid} error={name}: {exc}")
-            time.sleep(1.0)
-        emit(f"AWAITING_PHONE_INBOUND {device_path} (listening on Channel 22)")
+                    if "NotAvailable" in name or "not-supported" in str(exc).lower():
+                        # Phone not hosting — will connect into our server channel
+                        break
+            time.sleep(2.0)
+        emit(f"AWAITING_PHONE_INBOUND {device_path} (BlueZ profile listening on Channel {RFCOMM_CHANNEL})")
     finally:
         with _lock:
             _attempting_devices.discard(device_path)
@@ -428,51 +430,11 @@ def connect_already_connected_devices():
             start_connect_loop(str(path))
 
 
-# ── RFCOMM socket server ───────────────────────────────────────────────────────
-# Raw kernel RFCOMM socket on Channel 22. The kernel automatically registers
-# an SDP entry (Serial Port Profile) visible via `sdptool browse local`.
-# The phone connects to this channel when Android Auto detects our car class.
 
 RFCOMM_CHANNEL = 22
-AF_BLUETOOTH = socket.AF_BLUETOOTH   # 31
-BTPROTO_RFCOMM = 3
 
 
-def rfcomm_server_thread(config):
-    """Background thread: accept phone connections on RFCOMM Channel 22."""
-    try:
-        server_sock = socket.socket(AF_BLUETOOTH, socket.SOCK_STREAM, BTPROTO_RFCOMM)
-        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # Bind to any adapter, channel 22
-        server_sock.bind(("", RFCOMM_CHANNEL))
-        server_sock.listen(3)
-        emit(f"RFCOMM_SERVER_LISTENING channel={RFCOMM_CHANNEL}")
-    except OSError as e:
-        emit(f"RFCOMM_BIND_ERROR {e}")
-        return
-
-    while True:
-        try:
-            client_sock, (addr, channel) = server_sock.accept()
-            emit(f"RFCOMM_CLIENT_CONNECTED addr={addr} channel={channel}")
-            # Derive D-Bus style path for downstream log compatibility
-            device_path = "/org/bluez/hci0/dev_" + addr.replace(":", "_").upper()
-            with _lock:
-                _active_devices.add(device_path)
-            # Duplicate the fd so we can close client_sock independently
-            raw_fd = os.dup(client_sock.fileno())
-            client_sock.close()
-            threading.Thread(
-                target=handle_connection,
-                args=(raw_fd, config, device_path),
-                daemon=True,
-            ).start()
-        except OSError as e:
-            emit(f"RFCOMM_ACCEPT_ERROR {e}")
-            break
-
-
-# ── BlueZ Profile1 implementation (secondary path, raw RFCOMM socket is primary) ─
+# ── BlueZ Profile1 implementation ─────────────────────────────────────────────
 
 class AAWirelessProfile(dbus.service.Object):
     """BlueZ Profile1 handler — used when phone dials us via ConnectProfile."""
@@ -517,10 +479,7 @@ def main():
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     _bus = dbus.SystemBus()
 
-    # ── Primary: raw RFCOMM socket server (kernel registers SDP automatically) ──
-    threading.Thread(target=rfcomm_server_thread, args=(config,), daemon=True).start()
-
-    # ── Secondary: BlueZ RegisterProfile (enables head-unit-initiated connect) ──
+    # ── BlueZ RegisterProfile: handles both phone-initiated and head-unit-initiated ──
     manager = dbus.Interface(_bus.get_object("org.bluez", "/org/bluez"),
                              "org.bluez.ProfileManager1")
 
