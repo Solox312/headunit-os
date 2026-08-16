@@ -90,6 +90,11 @@ if command -v sdptool >/dev/null 2>&1; then
 fi
 
 # Set BT Alias and Discoverability
+# Trust all known paired devices
+for dev in $(bluetoothctl devices Paired 2>/dev/null | awk '{print $2}'); do
+  bluetoothctl trust "$dev" >/dev/null 2>&1 || true
+done
+
 bluetoothctl system-alias "HeadUnit-OS" >/dev/null 2>&1 || true
 bluetoothctl power on >/dev/null 2>&1 || true
 bluetoothctl discoverable on >/dev/null 2>&1 || true
