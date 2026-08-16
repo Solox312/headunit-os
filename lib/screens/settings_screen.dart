@@ -11,6 +11,7 @@ import '../providers/keyboard_provider.dart';
 import '../services/system_info_service.dart';
 import '../models/wifi_network.dart';
 import '../providers/update_provider.dart';
+import '../services/settings_storage_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -21,6 +22,21 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   String _audioOutputTarget = "AUX Cable / 3.5mm DAC";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAudioOutput();
+  }
+
+  Future<void> _loadAudioOutput() async {
+    final target = await SettingsStorageService().loadAudioOutputTarget();
+    if (mounted) {
+      setState(() {
+        _audioOutputTarget = target;
+      });
+    }
+  }
 
   void _showWifiPasswordDialog(BuildContext context, WifiProvider wifi, WifiNetwork network) {
     final passwordController = TextEditingController();
@@ -828,6 +844,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             setState(() {
               _audioOutputTarget = target;
             });
+            SettingsStorageService().saveAudioOutputTarget(target);
             if (target.contains("Bluetooth")) {
               _showCarBluetoothConnectDialog();
             }

@@ -29,6 +29,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.initState();
     final vehicle = context.read<VehicleProvider>();
     _nameController.text = vehicle.isDefaultDriverName ? "" : vehicle.driverName;
+    _loadStoredAudioOutput();
+  }
+
+  Future<void> _loadStoredAudioOutput() async {
+    final target = await SettingsStorageService().loadAudioOutputTarget();
+    if (mounted) {
+      setState(() {
+        _selectedAudioOutput = target;
+      });
+    }
   }
 
   Future<void> _completeOnboarding() async {
@@ -37,6 +47,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (_nameController.text.trim().isNotEmpty) {
       await vehicle.updateDriverName(_nameController.text);
     }
+    await SettingsStorageService().saveAudioOutputTarget(_selectedAudioOutput);
     await SettingsStorageService().saveOnboardingCompleted(true);
 
     if (!mounted) return;
@@ -541,6 +552,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         setState(() {
           _selectedAudioOutput = target;
         });
+        SettingsStorageService().saveAudioOutputTarget(target);
       },
     );
   }

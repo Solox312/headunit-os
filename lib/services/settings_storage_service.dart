@@ -151,4 +151,19 @@ class SettingsStorageService {
     }
     return false;
   }
+
+  /// Helper to save audio output target selection.
+  Future<void> saveAudioOutputTarget(String target) async {
+    await saveSettings({'audioOutputTarget': target});
+  }
+
+  /// Helper to read stored audio output target selection (defaults to 'AUX Cable / 3.5mm DAC').
+  Future<String> loadAudioOutputTarget() async {
+    final settings = await loadSettings();
+    if (settings.containsKey('audioOutputTarget') && settings['audioOutputTarget'] is String) {
+      final target = (settings['audioOutputTarget'] as String).trim();
+      if (target.isNotEmpty) return target;
+    }
+    return 'AUX Cable / 3.5mm DAC';
+  }
 }

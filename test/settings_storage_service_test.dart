@@ -22,6 +22,22 @@ void main() {
       expect(loaded, equals('Carl'));
     });
 
+    test('saveAudioOutputTarget and loadAudioOutputTarget persists selected target', () async {
+      final storage = SettingsStorageService();
+      await storage.saveAudioOutputTarget('Car Bluetooth Stereo (A2DP)');
+
+      final loaded = await storage.loadAudioOutputTarget();
+      expect(loaded, equals('Car Bluetooth Stereo (A2DP)'));
+    });
+
+    test('loadAudioOutputTarget returns default AUX target when unset or empty', () async {
+      final storage = SettingsStorageService();
+      await storage.saveSettings({'audioOutputTarget': ''});
+
+      final loaded = await storage.loadAudioOutputTarget();
+      expect(loaded, equals('AUX Cable / 3.5mm DAC'));
+    });
+
     test('VehicleProvider updateDriverName capitalizes lowercase names', () async {
       final provider = VehicleProvider();
       await provider.updateDriverName('carl smith');
