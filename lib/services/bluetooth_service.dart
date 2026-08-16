@@ -165,8 +165,58 @@ class BluetoothService {
     }
   }
 
+  /// Purge all stale unpaired devices from BlueZ discovery cache so powered-off devices disappear.
+  Future<void> purgeUnpairedDevices() async {
+    if (!await isBluetoothctlAvailable()) return;
+    try {
+      final paired = await getPairedDevices();
+      final pairedMacs = paired.map((p) => p.macAddress.toUpperCase()).toSet();
+      final result = await Process.run('bluetoothctl', ['devices']);
+      if (result.exitCode == 0) {
+        final lines = result.stdout.toString().split('\n');
+        for (var line in lines) {
+          if (line.trim().startsWith('Device')) {
+            final parts = line.trim().split(RegExp(r'\s+'));
+            if (parts.length >= 2) {
+              final mac = parts[1].trim();
+              if (!pairedMacs.contains(mac.toUpperCase())) {
+                await Process.run('bluetoothctl', ['remove', mac]);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('[BluetoothService] purgeUnpairedDevices error: $e');
+    }
+  }
+
+  /// Get detailed BlueZ info for a specific device MAC.
+  Future<Map<String, String>> getDeviceInfo(String macAddress) async {
+    final info = <String, String>{};
+    if (!await isBluetoothctlAvailable()) return info;
+    try {
+      final result = await Process.run('bluetoothctl', ['info', macAddress]);
+      if (result.exitCode == 0) {
+        final lines = result.stdout.toString().split('\n');
+        for (var line in lines) {
+          final trimmed = line.trim();
+          final colonIdx = trimmed.indexOf(':');
+          if (colonIdx > 0 && colonIdx < trimmed.length - 1) {
+            final key = trimmed.substring(0, colonIdx).trim();
+            final val = trimmed.substring(colonIdx + 1).trim();
+            info[key] = val;
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('[BluetoothService] getDeviceInfo error: $e');
+    }
+    return info;
+  }
+
   /// Scan for nearby Bluetooth devices on Linux Mint / Raspberry Pi.
-  Future<List<BluetoothDevice>> scanDevices() async {
+  Future<List<BluetoothDevice>> scanDevices({bool purgeStale = false}) async {
     if (!await isBluetoothctlAvailable()) {
       return _getMockDiscoveredDevices();
     }
@@ -176,9 +226,37 @@ class BluetoothService {
       await Process.run('rfkill', ['unblock', 'bluetooth']);
       await Process.run('bluetoothctl', ['power', 'on']);
 
-      // Perform a 4-second discovery scan
+      if (purgeStale) {
+        await purgeUnpairedDevices();
+      }
+
+      final liveNames = <String, String>{};
+      final liveSeen = <String>{};
+
+      // Perform a 5-second discovery scan while reading live stream output
       final process = await Process.start('bluetoothctl', ['scan', 'on']);
-      await Future.delayed(const Duration(seconds: 4));
+      final sub = process.stdout
+          .transform(const SystemEncoding().decoder)
+          .transform(const LineSplitter())
+          .listen((line) {
+        if (line.contains('Device ')) {
+          final match = RegExp(r'Device\s+(([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2})(\s+(.*))?').firstMatch(line);
+          if (match != null) {
+            final mac = match.group(1)!;
+            liveSeen.add(mac.toUpperCase());
+            final extra = match.group(4)?.trim();
+            if (extra != null && extra.isNotEmpty) {
+              final clean = extra.startsWith('Name: ') ? extra.substring(6).trim() : extra;
+              if (clean.isNotEmpty && !clean.contains('RSSI:')) {
+                liveNames[mac.toUpperCase()] = clean;
+              }
+            }
+          }
+        }
+      });
+
+      await Future.delayed(const Duration(seconds: 5));
+      await sub.cancel();
       process.kill();
 
       final result = await Process.run('bluetoothctl', ['devices']);
@@ -189,7 +267,36 @@ class BluetoothService {
 
       for (var line in lines) {
         if (line.trim().startsWith('Device')) {
-          final dev = BluetoothDevice.fromBluetoothctlLine(line);
+          var dev = BluetoothDevice.fromBluetoothctlLine(line);
+          final upperMac = dev.macAddress.toUpperCase();
+
+          // Apply live resolved name if available
+          if (liveNames.containsKey(upperMac) && liveNames[upperMac]!.isNotEmpty) {
+            final resolvedName = liveNames[upperMac]!;
+            dev = BluetoothDevice.fromBluetoothctlLine('Device ${dev.macAddress} $resolvedName');
+          }
+
+          // If the name is still just the MAC address or contains dashes, query info
+          final isGenericName = dev.name == dev.macAddress ||
+              dev.name.replaceAll(':', '-').toUpperCase() == dev.macAddress.replaceAll(':', '-').toUpperCase();
+          if (isGenericName) {
+            final info = await getDeviceInfo(dev.macAddress);
+            final realName = info['Name'] ?? info['Alias'];
+            final icon = info['Icon']?.toLowerCase();
+            if (realName != null && realName.isNotEmpty) {
+              BluetoothDeviceType type = dev.type;
+              if (icon != null) {
+                if (icon.contains('audio') || icon.contains('headset') || icon.contains('speaker')) {
+                  type = BluetoothDeviceType.audio;
+                } else if (icon.contains('phone')) {
+                  type = BluetoothDeviceType.phone;
+                }
+              }
+              dev = BluetoothDevice.fromBluetoothctlLine('Device ${dev.macAddress} $realName')
+                  .copyWith(type: type != BluetoothDeviceType.unknown ? type : null);
+            }
+          }
+
           discovered.add(dev);
         }
       }

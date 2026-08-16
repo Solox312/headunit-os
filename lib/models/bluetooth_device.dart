@@ -61,17 +61,21 @@ class BluetoothDevice {
     final lowerName = name.toLowerCase();
 
     BluetoothDeviceType devType = BluetoothDeviceType.unknown;
-    if (lowerName.contains('phone') || lowerName.contains('pixel') || lowerName.contains('iphone') || lowerName.contains('galaxy')) {
+    if (lowerName.contains('phone') || lowerName.contains('pixel') || lowerName.contains('iphone') || lowerName.contains('galaxy') || lowerName.contains('samsung') || lowerName.contains('xiaomi') || lowerName.contains('redmi') || lowerName.contains('oneplus') || lowerName.contains('motorola') || lowerName.contains('huawei')) {
       devType = BluetoothDeviceType.phone;
-    } else if (lowerName.contains('headset') || lowerName.contains('audio') || lowerName.contains('buds') || lowerName.contains('speaker')) {
+    } else if (lowerName.contains('headset') || lowerName.contains('headphone') || lowerName.contains('audio') || lowerName.contains('buds') || lowerName.contains('ear') || lowerName.contains('airpod') || lowerName.contains('speaker') || lowerName.contains('sound') || lowerName.contains('jbl') || lowerName.contains('bose') || lowerName.contains('sony') || lowerName.contains('anker') || lowerName.contains('soundcore') || lowerName.contains('beats') || lowerName.contains('echo') || lowerName.contains('marshall') || lowerName.contains('boom') || lowerName.contains('flip') || lowerName.contains('charge') || lowerName.contains('tribit') || lowerName.contains('oontz')) {
       devType = BluetoothDeviceType.audio;
-    } else if (lowerName.contains('car') || lowerName.contains('headunit') || lowerName.contains('auto')) {
+    } else if (lowerName.contains('car') || lowerName.contains('headunit') || lowerName.contains('auto') || lowerName.contains('sync') || lowerName.contains('stereo') || lowerName.contains('receiver') || lowerName.contains('mmi') || lowerName.contains('uconnect') || lowerName.contains('entune') || lowerName.contains('mbux') || lowerName.contains('bt-')) {
       devType = BluetoothDeviceType.car;
     }
 
+    // If the name is just a MAC with dashes (e.g. 11-22-33-44-55-66), clean it or fallback to mac
+    final isMacLikeName = RegExp(r'^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$').hasMatch(name) ||
+        RegExp(r'^([0-9a-fA-F]{2}[-]){5}[0-9a-fA-F]{2}$').hasMatch(name);
+
     return BluetoothDevice(
       macAddress: mac,
-      name: name.isEmpty ? mac : name,
+      name: isMacLikeName || name.isEmpty ? mac : name,
       type: devType,
       isPaired: isPaired,
       isConnected: isConnected,

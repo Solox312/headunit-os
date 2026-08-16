@@ -297,39 +297,85 @@ class BluetoothScreen extends StatelessWidget {
                                     "Discovered Nearby Devices",
                                     style: GoogleFonts.spaceGrotesk(fontSize: 15, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
                                   ),
-                                  if (bt.isScanning)
-                                    Text("Scanning...", style: GoogleFonts.inter(color: AutomotiveColors.electricCyan, fontSize: 11)),
+                                  Row(
+                                    children: [
+                                      if (!bt.isScanning && bt.discoveredDevices.isNotEmpty)
+                                        TextButton.icon(
+                                          style: TextButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            foregroundColor: AutomotiveColors.textSecondary,
+                                          ),
+                                          icon: const Icon(Icons.cleaning_services_rounded, size: 14),
+                                          label: Text("Clean Stale", style: GoogleFonts.inter(fontSize: 11)),
+                                          onPressed: () => bt.purgeStaleDiscoveredDevices(),
+                                        ),
+                                      if (bt.isScanning)
+                                        Text("Scanning...", style: GoogleFonts.inter(color: AutomotiveColors.electricCyan, fontSize: 11)),
+                                    ],
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 8),
                               if (bt.discoveredDevices.isEmpty && !bt.isScanning)
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                                  child: Text(
-                                    "No new nearby devices found. Put your phone in pairing mode and tap refresh.",
-                                    style: GoogleFonts.inter(color: AutomotiveColors.textMuted, fontSize: 12),
+                                  padding: const EdgeInsets.symmetric(vertical: 12.0),
+                                  child: Column(
+                                    children: [
+                                      Text(
+                                        "No new nearby devices found. Put your speaker/phone in pairing mode and tap scan.",
+                                        style: GoogleFonts.inter(color: AutomotiveColors.textMuted, fontSize: 12),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      OutlinedButton.icon(
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: AutomotiveColors.electricCyan,
+                                          side: const BorderSide(color: AutomotiveColors.electricCyan),
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        ),
+                                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                                        label: Text("Scan for Nearby Devices", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                                        onPressed: () => bt.purgeStaleDiscoveredDevices(),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ...bt.discoveredDevices.map((dev) {
                                 return ListTile(
                                   contentPadding: EdgeInsets.zero,
-                                  leading: Icon(_getDeviceIcon(dev.type), color: AutomotiveColors.textPrimary),
+                                  leading: Icon(_getDeviceIcon(dev.type), color: dev.type == BluetoothDeviceType.audio ? AutomotiveColors.electricCyan : AutomotiveColors.textPrimary),
                                   title: Text(
                                     dev.name,
-                                    style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontWeight: FontWeight.w500, fontSize: 13),
+                                    style: GoogleFonts.inter(
+                                      color: dev.type == BluetoothDeviceType.audio ? AutomotiveColors.electricCyan : AutomotiveColors.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                   subtitle: Text(
-                                    dev.macAddress,
+                                    dev.type == BluetoothDeviceType.audio
+                                        ? "${dev.macAddress} • Bluetooth Audio"
+                                        : dev.macAddress,
                                     style: GoogleFonts.jetBrainsMono(color: AutomotiveColors.textSecondary, fontSize: 11),
                                   ),
-                                  trailing: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AutomotiveColors.electricCyan,
-                                      foregroundColor: Colors.black,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    ),
-                                    onPressed: bt.isConnecting ? null : () => bt.pairAndConnect(dev.macAddress),
-                                    child: Text("Pair & Connect", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AutomotiveColors.electricCyan,
+                                          foregroundColor: Colors.black,
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        ),
+                                        onPressed: bt.isConnecting ? null : () => bt.pairAndConnect(dev.macAddress),
+                                        child: Text("Pair & Connect", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.close_rounded, color: AutomotiveColors.textMuted, size: 18),
+                                        onPressed: () => bt.removeDiscoveredDevice(dev.macAddress),
+                                        tooltip: "Remove from list",
+                                      ),
+                                    ],
                                   ),
                                 );
                               }),

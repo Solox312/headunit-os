@@ -165,7 +165,7 @@ class BluetoothProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> scanDevices() async {
+  Future<void> scanDevices({bool purgeStale = false}) async {
     if (!_isBluetoothEnabled || _isScanning) return;
 
     _isScanning = true;
@@ -173,14 +173,32 @@ class BluetoothProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _discoveredDevices = await _service.scanDevices();
+      final rawDiscovered = await _service.scanDevices(purgeStale: purgeStale);
       await refreshPairedDevices();
+
+      // Deduplicate: exclude devices that are already paired
+      final pairedMacs = _pairedDevices.map((d) => d.macAddress.toUpperCase()).toSet();
+      _discoveredDevices = rawDiscovered.where((d) => !pairedMacs.contains(d.macAddress.toUpperCase())).toList();
     } catch (e) {
       _errorMessage = 'Failed to scan Bluetooth devices: $e';
     } finally {
       _isScanning = false;
       notifyListeners();
     }
+  }
+
+  /// Remove a specific unpaired/discovered device from the BlueZ cache.
+  Future<void> removeDiscoveredDevice(String macAddress) async {
+    _discoveredDevices.removeWhere((d) => d.macAddress.toUpperCase() == macAddress.toUpperCase());
+    notifyListeners();
+    await _service.removeDevice(macAddress);
+  }
+
+  /// Clear all unpaired cached devices and run a clean live scan.
+  Future<void> purgeStaleDiscoveredDevices() async {
+    _discoveredDevices.clear();
+    notifyListeners();
+    await scanDevices(purgeStale: true);
   }
 
   Future<bool> pairAndConnect(String macAddress) async {
@@ -192,7 +210,7 @@ class BluetoothProvider extends ChangeNotifier {
       final success = await _service.pairAndConnect(macAddress);
       if (success) {
         await refreshPairedDevices();
-        _discoveredDevices.removeWhere((dev) => dev.macAddress == macAddress);
+        _discoveredDevices.removeWhere((dev) => dev.macAddress.toUpperCase() == macAddress.toUpperCase());
         return true;
       } else {
         _errorMessage = 'Failed to pair with device ($macAddress). Ensure device is in pairing mode.';

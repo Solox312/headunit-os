@@ -10,6 +10,7 @@ import '../providers/display_provider.dart';
 import '../providers/keyboard_provider.dart';
 import '../services/system_info_service.dart';
 import '../models/wifi_network.dart';
+import '../models/bluetooth_device.dart';
 import '../providers/update_provider.dart';
 import '../services/settings_storage_service.dart';
 import '../providers/time_date_provider.dart';
@@ -893,6 +894,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     context.read<BluetoothProvider>().scanDevices();
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: AutomotiveColors.glassPanel,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -900,65 +902,156 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) {
         return Consumer<BluetoothProvider>(
           builder: (context, bt, child) {
-            return Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
+            return ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.bluetooth_audio_rounded, color: AutomotiveColors.electricCyan),
+                            const SizedBox(width: 10),
+                            Text(
+                              "Select Bluetooth Audio Device",
+                              style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            if (!bt.isScanning && bt.discoveredDevices.isNotEmpty)
+                              TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  foregroundColor: AutomotiveColors.textSecondary,
+                                ),
+                                icon: const Icon(Icons.cleaning_services_rounded, size: 14),
+                                label: Text("Clean Stale", style: GoogleFonts.inter(fontSize: 11)),
+                                onPressed: () => bt.purgeStaleDiscoveredDevices(),
+                              ),
+                            IconButton(
+                              icon: bt.isScanning
+                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AutomotiveColors.electricCyan))
+                                  : const Icon(Icons.refresh_rounded, color: AutomotiveColors.electricCyan),
+                              onPressed: bt.isScanning ? null : () => bt.scanDevices(),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: ListView(
+                        shrinkWrap: true,
                         children: [
-                          const Icon(Icons.bluetooth_audio_rounded, color: AutomotiveColors.electricCyan),
-                          const SizedBox(width: 10),
-                          Text(
-                            "Select Car Bluetooth Audio Output",
-                            style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
+                          Text("PAIRED BLUETOOTH DEVICES", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: AutomotiveColors.textSecondary)),
+                          const SizedBox(height: 6),
+                          if (bt.pairedDevices.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Text("No paired Bluetooth devices found.", style: GoogleFonts.inter(color: AutomotiveColors.textMuted, fontSize: 12)),
+                            ),
+                          ...bt.pairedDevices.map((dev) {
+                            final isConnected = dev.isConnected;
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(Icons.bluetooth_audio_rounded, color: isConnected ? AutomotiveColors.nativeGreen : AutomotiveColors.textPrimary),
+                              title: Text(dev.name, style: GoogleFonts.inter(color: isConnected ? AutomotiveColors.nativeGreen : AutomotiveColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
+                              subtitle: Text(dev.macAddress, style: GoogleFonts.jetBrainsMono(color: AutomotiveColors.textSecondary, fontSize: 11)),
+                              trailing: isConnected
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(color: AutomotiveColors.nativeGreen.withAlpha(30), borderRadius: BorderRadius.circular(6)),
+                                      child: Text("Connected", style: GoogleFonts.inter(color: AutomotiveColors.nativeGreen, fontSize: 11, fontWeight: FontWeight.bold)),
+                                    )
+                                  : ElevatedButton(
+                                      style: ElevatedButton.styleFrom(backgroundColor: AutomotiveColors.electricCyan, foregroundColor: Colors.black),
+                                      onPressed: () {
+                                        bt.pairAndConnect(dev.macAddress);
+                                        setState(() {
+                                          _audioOutputTarget = "Car Bluetooth Stereo (A2DP)";
+                                        });
+                                        SettingsStorageService().saveAudioOutputTarget("Car Bluetooth Stereo (A2DP)");
+                                        Navigator.pop(context);
+                                      },
+                                      child: Text("Connect", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                                    ),
+                            );
+                          }),
+                          const SizedBox(height: 14),
+                          const Divider(color: AutomotiveColors.strokeSoft),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text("DISCOVERED NEARBY DEVICES", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: AutomotiveColors.textSecondary)),
+                              if (bt.isScanning)
+                                Text("Scanning for speakers...", style: GoogleFonts.inter(color: AutomotiveColors.electricCyan, fontSize: 11)),
+                            ],
                           ),
+                          const SizedBox(height: 6),
+                          if (bt.discoveredDevices.isEmpty && !bt.isScanning)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10.0),
+                              child: Text(
+                                "No new nearby devices found. Put your speaker in pairing mode and tap refresh.",
+                                style: GoogleFonts.inter(color: AutomotiveColors.textMuted, fontSize: 12),
+                              ),
+                            ),
+                          ...bt.discoveredDevices.map((dev) {
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(Icons.bluetooth_searching_rounded, color: AutomotiveColors.electricCyan),
+                              title: Text(
+                                dev.name,
+                                style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 13),
+                              ),
+                              subtitle: Text(
+                                dev.type == BluetoothDeviceType.audio ? "${dev.macAddress} • Bluetooth Audio" : dev.macAddress,
+                                style: GoogleFonts.jetBrainsMono(color: AutomotiveColors.textSecondary, fontSize: 11),
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AutomotiveColors.electricCyan,
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    ),
+                                    onPressed: () async {
+                                      final nav = Navigator.of(context);
+                                      final ok = await bt.pairAndConnect(dev.macAddress);
+                                      if (ok && mounted) {
+                                        setState(() {
+                                          _audioOutputTarget = "Car Bluetooth Stereo (A2DP)";
+                                        });
+                                        SettingsStorageService().saveAudioOutputTarget("Car Bluetooth Stereo (A2DP)");
+                                        nav.pop();
+                                      }
+                                    },
+                                    child: Text("Pair & Connect", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close_rounded, color: AutomotiveColors.textMuted, size: 18),
+                                    onPressed: () => bt.removeDiscoveredDevice(dev.macAddress),
+                                    tooltip: "Remove from list",
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
                         ],
                       ),
-                      IconButton(
-                        icon: bt.isScanning
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AutomotiveColors.electricCyan))
-                            : const Icon(Icons.refresh_rounded, color: AutomotiveColors.electricCyan),
-                        onPressed: bt.isScanning ? null : () => bt.scanDevices(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text("PAIRED BLUETOOTH RECEIVERS", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: AutomotiveColors.textSecondary)),
-                  const SizedBox(height: 6),
-                  if (bt.pairedDevices.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text("No paired Bluetooth devices found.", style: GoogleFonts.inter(color: AutomotiveColors.textMuted, fontSize: 12)),
                     ),
-                  ...bt.pairedDevices.map((dev) {
-                    final isConnected = dev.isConnected;
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.bluetooth_audio_rounded, color: isConnected ? AutomotiveColors.nativeGreen : AutomotiveColors.textPrimary),
-                      title: Text(dev.name, style: GoogleFonts.inter(color: isConnected ? AutomotiveColors.nativeGreen : AutomotiveColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
-                      subtitle: Text(dev.macAddress, style: GoogleFonts.jetBrainsMono(color: AutomotiveColors.textSecondary, fontSize: 11)),
-                      trailing: isConnected
-                          ? Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(color: AutomotiveColors.nativeGreen.withAlpha(30), borderRadius: BorderRadius.circular(6)),
-                              child: Text("Connected", style: GoogleFonts.inter(color: AutomotiveColors.nativeGreen, fontSize: 11, fontWeight: FontWeight.bold)),
-                            )
-                          : ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: AutomotiveColors.electricCyan, foregroundColor: Colors.black),
-                              onPressed: () {
-                                bt.pairAndConnect(dev.macAddress);
-                                Navigator.pop(context);
-                              },
-                              child: Text("Connect", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
-                            ),
-                    );
-                  }),
-                ],
+                  ],
+                ),
               ),
             );
           },

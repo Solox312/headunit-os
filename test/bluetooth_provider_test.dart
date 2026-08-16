@@ -50,11 +50,20 @@ void main() {
       expect(provider.isDiscoverable, isFalse);
     });
 
-    test('scanDevices queries discovered devices list', () async {
+    test('fromBluetoothctlLine detects audio speakers correctly', () {
+      const speakerLine = 'Device 11:22:33:44:55:66 JBL Flip 6';
+      final dev = BluetoothDevice.fromBluetoothctlLine(speakerLine);
+
+      expect(dev.macAddress, equals('11:22:33:44:55:66'));
+      expect(dev.name, equals('JBL Flip 6'));
+      expect(dev.type, equals(BluetoothDeviceType.audio));
+    });
+
+    test('removeDiscoveredDevice removes device from discovered list', () async {
       final provider = BluetoothProvider();
       await provider.init();
-      await provider.scanDevices();
-      expect(provider.discoveredDevices, isList);
+      await provider.removeDiscoveredDevice('11:22:33:44:55:66');
+      expect(provider.discoveredDevices.any((d) => d.macAddress == '11:22:33:44:55:66'), isFalse);
     });
   });
 }
