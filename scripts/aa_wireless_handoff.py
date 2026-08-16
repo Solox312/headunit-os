@@ -483,6 +483,13 @@ def main():
     for index, uuid in enumerate(AA_UUID_CANDIDATES):
         path = f"{PROFILE_PATH}{index}"
         channel_num = channels.get(uuid, 22 + index)
+        
+        # Try unregistering stale profile first
+        try:
+            manager.UnregisterProfile(path)
+        except Exception:
+            pass
+
         try:
             AAWirelessProfile(_bus, path, config)
             profile_opts = {
@@ -496,7 +503,12 @@ def main():
             registered_paths.append(path)
             emit(f"PROFILE_REGISTERED uuid={uuid} channel={channel_num}")
         except dbus.exceptions.DBusException as exc:
-            emit(f"PROFILE_REGISTER_FAILED uuid={uuid} error={exc}")
+            if "already registered" in str(exc).lower() or "notpermitted" in str(exc).lower():
+                # Profile is already active in BlueZ, treat as registered
+                registered_paths.append(path)
+                emit(f"PROFILE_ALREADY_ACTIVE uuid={uuid} channel={channel_num}")
+            else:
+                emit(f"PROFILE_REGISTER_FAILED uuid={uuid} error={exc}")
 
     if not registered_paths:
         emit("ERROR no AA profile could be registered")

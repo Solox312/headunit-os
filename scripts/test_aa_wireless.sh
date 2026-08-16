@@ -123,6 +123,10 @@ fi
 # ── 5. Live Handoff Daemon Test ───────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}[Step 5/5] Launching Live Bluetooth RFCOMM Handoff Daemon...${NC}"
+echo -e "  ${YELLOW}Stopping any background AA handoff processes...${NC}"
+sudo pkill -f aa_wireless_handoff.py 2>/dev/null || true
+sleep 1
+
 echo -e "${MAGENTA}👉 INSTRUCTIONS:${NC}"
 echo -e "   1. On your Android phone, turn on Bluetooth and Wi-Fi."
 echo -e "   2. In Android Settings -> Bluetooth, tap ${CYAN}'HeadUnit-OS'${NC} to pair."
