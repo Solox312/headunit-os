@@ -62,6 +62,22 @@ void main() {
       expect(loaded, equals('yyyy-MM-dd'));
     });
 
+    test('saveFmFrequency and loadFmFrequency persists FM frequency', () async {
+      final storage = SettingsStorageService();
+      await storage.saveFmFrequency(91.7);
+
+      final loaded = await storage.loadFmFrequency();
+      expect(loaded, equals(91.7));
+    });
+
+    test('saveFmHardwareType and loadFmHardwareType persists hardware type', () async {
+      final storage = SettingsStorageService();
+      await storage.saveFmHardwareType('kt0803k');
+
+      final loaded = await storage.loadFmHardwareType();
+      expect(loaded, equals('kt0803k'));
+    });
+
     test('VehicleProvider updateDriverName capitalizes lowercase names', () async {
       final provider = VehicleProvider();
       await provider.updateDriverName('carl smith');

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 enum FmHardwareType {
+  kt0803k, // On-board KT0803K / KT0803L / KT0803M (I2C 0x3E)
   si4713, // Silicon Labs Si4713 (I2C 0x63, RDS supported)
   kt0803l, // KT0803L / KT0803M (I2C 0x3E)
   qn8027, // QN8027 / QN8066 (I2C 0x2C)
@@ -20,6 +21,76 @@ class FmTransmitterService {
 
       final gpioResult = await Process.run('which', ['fm_transmitter']);
       return gpioResult.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Probes the I2C bus (and system drivers) to detect available FM transmitter hardware.
+  Future<FmHardwareType?> detectHardware() async {
+    if (!Platform.isLinux) {
+      // In simulator / development mode, assume KT0803K
+      return FmHardwareType.kt0803k;
+    }
+
+    try {
+      final whichI2c = await Process.run('which', ['i2cget']);
+      if (whichI2c.exitCode == 0) {
+        // Probe KT0803K at address 0x3E on bus 1
+        final ktResult = await Process.run('i2cget', ['-y', '1', '0x3E', '0x00']);
+        if (ktResult.exitCode == 0) {
+          if (kDebugMode) print('[FmTransmitterService] KT0803K detected on I2C bus 1 (0x3E)');
+          return FmHardwareType.kt0803k;
+        }
+
+        // Probe Si4713 at address 0x63 on bus 1
+        final siResult = await Process.run('i2cget', ['-y', '1', '0x63', '0x00']);
+        if (siResult.exitCode == 0) {
+          if (kDebugMode) print('[FmTransmitterService] Si4713 detected on I2C bus 1 (0x63)');
+          return FmHardwareType.si4713;
+        }
+
+        // Probe QN8027 at address 0x2C on bus 1
+        final qnResult = await Process.run('i2cget', ['-y', '1', '0x2C', '0x00']);
+        if (qnResult.exitCode == 0) {
+          if (kDebugMode) print('[FmTransmitterService] QN8027 detected on I2C bus 1 (0x2C)');
+          return FmHardwareType.qn8027;
+        }
+      }
+
+      // Check software GPIO transmitter
+      final whichGpio = await Process.run('which', ['fm_transmitter']);
+      if (whichGpio.exitCode == 0) {
+        return FmHardwareType.gpioSoftware;
+      }
+    } catch (e) {
+      if (kDebugMode) print('[FmTransmitterService] detectHardware exception: $e');
+    }
+
+    return null;
+  }
+
+  /// Probe whether a specific hardware type responds on the bus.
+  Future<bool> probeDevice(FmHardwareType hardwareType) async {
+    if (!Platform.isLinux) return true;
+    try {
+      switch (hardwareType) {
+        case FmHardwareType.kt0803k:
+        case FmHardwareType.kt0803l:
+          final result = await Process.run('i2cget', ['-y', '1', '0x3E', '0x00']);
+          return result.exitCode == 0;
+        case FmHardwareType.si4713:
+          final result = await Process.run('i2cget', ['-y', '1', '0x63', '0x00']);
+          return result.exitCode == 0;
+        case FmHardwareType.qn8027:
+          final result = await Process.run('i2cget', ['-y', '1', '0x2C', '0x00']);
+          return result.exitCode == 0;
+        case FmHardwareType.gpioSoftware:
+          final result = await Process.run('which', ['fm_transmitter']);
+          return result.exitCode == 0;
+        default:
+          return false;
+      }
     } catch (_) {
       return false;
     }
@@ -44,6 +115,10 @@ class FmTransmitterService {
 
     try {
       switch (hardwareType) {
+        case FmHardwareType.kt0803k:
+        case FmHardwareType.kt0803l:
+          return await _setKt0803kFrequency(clampedFreq);
+
         case FmHardwareType.si4713:
           // Si4713 I2C 0x63 frequency tuning command (0x40 0x00 + FreqIn10kHz)
           final freq10kHz = (clampedFreq * 100).toInt();
@@ -53,12 +128,6 @@ class FmTransmitterService {
           if (rdsText.isNotEmpty) {
             await _setSi4713Rds(rdsText);
           }
-          return true;
-
-        case FmHardwareType.kt0803l:
-          // KT0803L I2C 0x3E frequency registers
-          final channelVal = ((clampedFreq - 87.0) * 20).toInt();
-          await Process.run('i2cset', ['-y', '1', '0x3E', '0x00', '0x${channelVal.toRadixString(16)}'], runInShell: true);
           return true;
 
         case FmHardwareType.qn8027:
@@ -77,6 +146,65 @@ class FmTransmitterService {
       }
     } catch (e) {
       if (kDebugMode) print('[FmTransmitterService] setFrequency exception: $e');
+      return false;
+    }
+  }
+
+  /// Exact KT0803K / KT0803L I2C register protocol on bus 1 (0x3E).
+  Future<bool> _setKt0803kFrequency(double clampedFreq) async {
+    try {
+      // Channel calculation: F_RF = 50kHz * CHSEL + 64.0MHz => CHSEL = (F_MHz - 64.0) * 20
+      final int chan = ((clampedFreq - 64.0) * 20).round();
+      final int chanLow = chan & 0xFF;
+      final int chanHigh = (chan >> 8) & 0x03;
+
+      // Reg 0x01: AU_EN (0x10) | PHTCNST_75us (0x08) | CHSEL[9:8] (chanHigh & 0x03)
+      final int reg01 = chanHigh | 0x18;
+      // Reg 0x02: Max RF power amplifier level (~108 dBuV)
+      const int reg02 = 0xB0;
+      // Reg 0x04: Unmuted, standard PGA audio gain
+      const int reg04 = 0x00;
+      // Reg 0x0B: Stereo transmission with 19kHz pilot tone
+      const int reg0B = 0x00;
+      // Reg 0x13: Active power mode (not standby)
+      const int reg13 = 0x00;
+
+      const bus = '1';
+      await Process.run('i2cset', ['-y', bus, '0x3E', '0x00', '0x${chanLow.toRadixString(16).padLeft(2, '0')}'], runInShell: true);
+      await Process.run('i2cset', ['-y', bus, '0x3E', '0x01', '0x${reg01.toRadixString(16).padLeft(2, '0')}'], runInShell: true);
+      await Process.run('i2cset', ['-y', bus, '0x3E', '0x02', '0x${reg02.toRadixString(16).padLeft(2, '0')}'], runInShell: true);
+      await Process.run('i2cset', ['-y', bus, '0x3E', '0x04', '0x${reg04.toRadixString(16).padLeft(2, '0')}'], runInShell: true);
+      await Process.run('i2cset', ['-y', bus, '0x3E', '0x0B', '0x${reg0B.toRadixString(16).padLeft(2, '0')}'], runInShell: true);
+      await Process.run('i2cset', ['-y', bus, '0x3E', '0x13', '0x${reg13.toRadixString(16).padLeft(2, '0')}'], runInShell: true);
+
+      if (kDebugMode) {
+        print('[FmTransmitterService] KT0803K configured: ${clampedFreq.toStringAsFixed(1)} MHz (Channel 0x${chan.toRadixString(16)})');
+      }
+      return true;
+    } catch (e) {
+      if (kDebugMode) print('[FmTransmitterService] Error communicating with KT0803K: $e');
+      return false;
+    }
+  }
+
+  /// Sets standby or active power state on the hardware.
+  Future<bool> setPowerState({
+    required bool enabled,
+    required FmHardwareType hardwareType,
+  }) async {
+    if (!await isHardwareDriverAvailable()) return true;
+    try {
+      if (hardwareType == FmHardwareType.kt0803k || hardwareType == FmHardwareType.kt0803l) {
+        const bus = '1';
+        if (!enabled) {
+          // Set standby bit in Reg 0x01 (Bit 6 = 0x40) and Reg 0x13
+          await Process.run('i2cset', ['-y', bus, '0x3E', '0x01', '0x40'], runInShell: true);
+          await Process.run('i2cset', ['-y', bus, '0x3E', '0x13', '0x01'], runInShell: true);
+        }
+      }
+      return true;
+    } catch (e) {
+      if (kDebugMode) print('[FmTransmitterService] setPowerState error: $e');
       return false;
     }
   }

@@ -6,9 +6,10 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('FmTransmitterProvider State Tests', () {
-    test('FmTransmitterProvider initializes with default frequency 88.3 MHz', () {
+    test('FmTransmitterProvider initializes with default frequency 88.3 MHz and KT0803K hardware', () {
       final provider = FmTransmitterProvider();
       expect(provider.frequencyMhz, equals(88.3));
+      expect(provider.selectedHardware, equals(FmHardwareType.kt0803k));
       expect(provider.isTransmitting, isTrue);
       expect(provider.rdsEnabled, isTrue);
       expect(provider.presetFrequencies, contains(88.3));

@@ -209,4 +209,47 @@ class SettingsStorageService {
     }
     return 'EEEE, MMMM d, yyyy';
   }
+
+  /// Helper to save FM transmitter frequency.
+  Future<void> saveFmFrequency(double freqMhz) async {
+    await saveSettings({'fmFrequency': freqMhz});
+  }
+
+  /// Helper to read stored FM transmitter frequency (defaults to 88.3 MHz).
+  Future<double> loadFmFrequency() async {
+    final settings = await loadSettings();
+    if (settings.containsKey('fmFrequency') && settings['fmFrequency'] is num) {
+      return (settings['fmFrequency'] as num).toDouble();
+    }
+    return 88.3;
+  }
+
+  /// Helper to save FM transmitter hardware type.
+  Future<void> saveFmHardwareType(String hardwareType) async {
+    await saveSettings({'fmHardwareType': hardwareType});
+  }
+
+  /// Helper to read stored FM transmitter hardware type (defaults to 'kt0803k').
+  Future<String> loadFmHardwareType() async {
+    final settings = await loadSettings();
+    if (settings.containsKey('fmHardwareType') && settings['fmHardwareType'] is String) {
+      final type = (settings['fmHardwareType'] as String).trim();
+      if (type.isNotEmpty) return type;
+    }
+    return 'kt0803k';
+  }
+
+  /// Helper to save FM transmitting power/enabled state.
+  Future<void> saveFmTransmitting(bool isTransmitting) async {
+    await saveSettings({'fmTransmitting': isTransmitting});
+  }
+
+  /// Helper to read stored FM transmitting state (defaults to true).
+  Future<bool> loadFmTransmitting() async {
+    final settings = await loadSettings();
+    if (settings.containsKey('fmTransmitting') && settings['fmTransmitting'] is bool) {
+      return settings['fmTransmitting'] as bool;
+    }
+    return true;
+  }
 }

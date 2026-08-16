@@ -1160,6 +1160,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SettingsStorageService().saveAudioOutputTarget(target);
             if (target.contains("Bluetooth")) {
               _showCarBluetoothConnectDialog();
+            } else if (target.contains("FM Transmitter")) {
+              context.read<FmTransmitterProvider>().toggleTransmitter(true);
             }
           },
         ),
@@ -1537,12 +1539,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        const Icon(Icons.cell_tower_rounded, color: AutomotiveColors.orangeAccent, size: 20),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          "FM Frequency Tuner",
-                                          style: GoogleFonts.spaceGrotesk(fontSize: 14, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.cell_tower_rounded, color: AutomotiveColors.orangeAccent, size: 20),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              "FM Frequency Tuner",
+                                              style: GoogleFonts.spaceGrotesk(fontSize: 14, fontWeight: FontWeight.bold, color: AutomotiveColors.textPrimary),
+                                            ),
+                                          ],
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: fm.isTransmitting ? AutomotiveColors.nativeGreen.withAlpha(30) : AutomotiveColors.panelDark,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: fm.isTransmitting ? AutomotiveColors.nativeGreen.withAlpha(120) : AutomotiveColors.strokeSoft,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.memory_rounded,
+                                                size: 13,
+                                                color: fm.isTransmitting ? AutomotiveColors.nativeGreen : AutomotiveColors.textMuted,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                "KT0803K (0x3E)",
+                                                style: GoogleFonts.jetBrainsMono(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: fm.isTransmitting ? AutomotiveColors.nativeGreen : AutomotiveColors.textMuted,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ],
                                     ),
