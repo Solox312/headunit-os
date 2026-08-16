@@ -1551,33 +1551,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                             ),
                                           ],
                                         ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: fm.isTransmitting ? AutomotiveColors.nativeGreen.withAlpha(30) : AutomotiveColors.panelDark,
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(
-                                              color: fm.isTransmitting ? AutomotiveColors.nativeGreen.withAlpha(120) : AutomotiveColors.strokeSoft,
+                                        InkWell(
+                                          onTap: fm.isDetecting ? null : () => fm.detectHardware(),
+                                          borderRadius: BorderRadius.circular(6),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: fm.isHardwareDetected
+                                                  ? AutomotiveColors.nativeGreen.withAlpha(25)
+                                                  : AutomotiveColors.orangeAccent.withAlpha(25),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(
+                                                color: fm.isHardwareDetected
+                                                    ? AutomotiveColors.nativeGreen.withAlpha(120)
+                                                    : AutomotiveColors.orangeAccent.withAlpha(120),
+                                              ),
                                             ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.memory_rounded,
-                                                size: 13,
-                                                color: fm.isTransmitting ? AutomotiveColors.nativeGreen : AutomotiveColors.textMuted,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                "KT0803K (0x3E)",
-                                                style: GoogleFonts.jetBrainsMono(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: fm.isTransmitting ? AutomotiveColors.nativeGreen : AutomotiveColors.textMuted,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (fm.isDetecting)
+                                                  const SizedBox(
+                                                    width: 10,
+                                                    height: 10,
+                                                    child: CircularProgressIndicator(strokeWidth: 1.5, color: AutomotiveColors.electricCyan),
+                                                  )
+                                                else
+                                                  Icon(
+                                                    fm.isHardwareDetected ? Icons.memory_rounded : Icons.help_outline_rounded,
+                                                    size: 13,
+                                                    color: fm.isHardwareDetected ? AutomotiveColors.nativeGreen : AutomotiveColors.orangeAccent,
+                                                  ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  fm.isHardwareDetected ? "KT0803K (0x3E) Detected" : "KT0803K (0x3E) Check",
+                                                  style: GoogleFonts.jetBrainsMono(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: fm.isHardwareDetected ? AutomotiveColors.nativeGreen : AutomotiveColors.orangeAccent,
+                                                  ),
                                                 ),
-                                              ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ],

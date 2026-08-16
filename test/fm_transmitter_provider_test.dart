@@ -56,5 +56,11 @@ void main() {
       provider.setHardwareType(FmHardwareType.kt0803l);
       expect(provider.selectedHardware, equals(FmHardwareType.kt0803l));
     });
+
+    test('detectHardware sets isHardwareDetected', () async {
+      final provider = FmTransmitterProvider();
+      await provider.detectHardware();
+      expect(provider.isHardwareDetected, isTrue);
+    });
   });
 }
