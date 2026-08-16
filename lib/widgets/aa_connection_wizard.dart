@@ -31,8 +31,8 @@ class _AAConnectionWizardState extends State<AAConnectionWizard>
 
   StreamSubscription<AAConnectionEvent>? _sub;
 
-  AAConnectionStep _step = AAConnectionStep.hotspotCreating;
-  String _statusMessage = 'Initializing Wireless Android Auto…';
+  AAConnectionStep _step = AAConnectionStep.waitingForPhone;
+  String _statusMessage = 'Waiting for phone Bluetooth connection…';
   bool _hasError = false;
 
   @override
