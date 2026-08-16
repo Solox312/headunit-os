@@ -386,14 +386,13 @@ def start_connect_loop(device_path):
             advertised = set()
         
         candidates = [u for u in AA_UUID_CANDIDATES if u in advertised]
-        if not candidates:
-            candidates = list(AA_UUID_CANDIDATES)
-
-        emit(f"PHONE_SEEN {device_path} candidates={','.join(candidates)}")
-        # Trigger async ConnectProfile on the GLib event loop after a short 1s delay for SDP settling
-        GLib.timeout_add(1000, lambda: _try_connect_profiles(device_path, candidates, attempt=1))
-        # Schedule a fallback retry at 3.5s if not yet connected
-        GLib.timeout_add(3500, lambda: _try_connect_profiles(device_path, candidates, attempt=2))
+        if candidates:
+            emit(f"PHONE_SEEN_HOSTING {device_path} candidates={','.join(candidates)}")
+            # Trigger async ConnectProfile on the GLib event loop after a short 1s delay for SDP settling
+            GLib.timeout_add(1000, lambda: _try_connect_profiles(device_path, candidates, attempt=1))
+            GLib.timeout_add(3500, lambda: _try_connect_profiles(device_path, candidates, attempt=2))
+        else:
+            emit(f"PHONE_CLIENT_CONNECTED {device_path} (Awaiting phone inbound connection to Channel 22)")
 
     GLib.idle_add(_schedule)
 
