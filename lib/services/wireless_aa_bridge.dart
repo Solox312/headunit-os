@@ -196,6 +196,7 @@ class WirelessAABridge {
       scriptPath,
       '--ssid', _hotspotSsid,
       '--psk', _hotspotPassword,
+      '--ip', '10.42.0.1',
       '--port', '$_aaTcpPort',
     ]);
 

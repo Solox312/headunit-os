@@ -244,12 +244,8 @@ def detect_bssid(explicit):
 
 
 def detect_hotspot_ip(explicit):
-    """Live IP of the hotspot AP interface. nmcli's ipv4.method=shared does
-    NOT reliably assign 10.42.0.1 — it's been observed assigning
-    192.168.43.1 on real hardware — so this is read from the interface
-    itself right before use rather than assumed from a CLI default. Falls
-    back to --ip only if detection fails outright (e.g. hotspot not up
-    yet)."""
+    """Live IP of the hotspot AP interface. Read from the interface itself
+    right before use. Falls back to explicit --ip or standard 10.42.0.1."""
     iface = _find_wireless_iface()
     if iface:
         try:
@@ -262,7 +258,9 @@ def detect_hotspot_ip(explicit):
                 return match.group(1)
         except (OSError, subprocess.SubprocessError):
             pass
-    return explicit
+    if explicit:
+        return explicit
+    return "10.42.0.1"
 
 
 def handle_connection(fd, config, device_path):
