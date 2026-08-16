@@ -43,6 +43,9 @@ echo -e "${BOLD}[Step 2/5] Checking Bluetooth Controller & Device Class...${NC}"
 
 # Stop any background headunit UI service that could be spamming bluetoothctl
 sudo systemctl stop headunit.service flutter-pi.service openauto.service 2>/dev/null || true
+sudo pkill -9 -f "flutter-pi" 2>/dev/null || true
+sudo pkill -9 -f "bluetoothctl" 2>/dev/null || true
+sleep 1
 
 sudo rfkill unblock bluetooth 2>/dev/null || true
 sudo systemctl start bluetooth
