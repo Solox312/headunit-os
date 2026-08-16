@@ -489,6 +489,43 @@ def main():
         SPP_UUID:         1,   # Serial Port Profile (fallback)
         GOOGLE_AA_UUID:   23,  # Google Android Auto secondary UUID
     }
+    aa_service_record = f"""<?xml version="1.0" encoding="UTF-8"?>
+<record>
+  <attribute id="0x0001">
+    <sequence>
+      <uuid value="{AA_WIRELESS_UUID}"/>
+      <uuid value="0x1101"/>
+    </sequence>
+  </attribute>
+  <attribute id="0x0004">
+    <sequence>
+      <sequence>
+        <uuid value="0x0100"/>
+      </sequence>
+      <sequence>
+        <uuid value="0x0003"/>
+        <uint8 value="22"/>
+      </sequence>
+    </sequence>
+  </attribute>
+  <attribute id="0x0005">
+    <sequence>
+      <uuid value="0x1002"/>
+    </sequence>
+  </attribute>
+  <attribute id="0x0009">
+    <sequence>
+      <sequence>
+        <uuid value="{AA_WIRELESS_UUID}"/>
+        <uint16 value="0x0102"/>
+      </sequence>
+    </sequence>
+  </attribute>
+  <attribute id="0x0100">
+    <text value="Android Auto Wireless"/>
+  </attribute>
+</record>"""
+
     for index, (uuid, channel_num) in enumerate(profile_map.items()):
         path = f"{PROFILE_PATH}{index}"
         try:
@@ -501,14 +538,18 @@ def main():
             _profile_objects.append(profile_obj)
             profile_opts = {
                 "Name": "Android Auto Wireless",
-                "Service": uuid,
                 "Role": "server",
-                "Version": dbus.UInt16(0x0102),
                 "RequireAuthentication": dbus.Boolean(False),
                 "RequireAuthorization": dbus.Boolean(False),
                 "Channel": dbus.UInt16(channel_num),
                 "AutoConnect": dbus.Boolean(False),
             }
+            if uuid == AA_WIRELESS_UUID:
+                profile_opts["ServiceRecord"] = aa_service_record
+            else:
+                profile_opts["Service"] = uuid
+                profile_opts["Version"] = dbus.UInt16(0x0102)
+
             manager.RegisterProfile(path, uuid, profile_opts)
             registered_paths.append(path)
             emit(f"PROFILE_REGISTERED uuid={uuid} channel={channel_num}")
