@@ -945,6 +945,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ],
                     ),
+                    if (bt.errorMessage != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AutomotiveColors.redAccent.withAlpha(25),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AutomotiveColors.redAccent.withAlpha(100)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline_rounded, color: AutomotiveColors.redAccent, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                bt.errorMessage!,
+                                style: GoogleFonts.inter(color: AutomotiveColors.redAccent, fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     Expanded(
                       child: ListView(
@@ -972,15 +995,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     )
                                   : ElevatedButton(
                                       style: ElevatedButton.styleFrom(backgroundColor: AutomotiveColors.electricCyan, foregroundColor: Colors.black),
-                                      onPressed: () {
-                                        bt.pairAndConnect(dev.macAddress);
-                                        setState(() {
-                                          _audioOutputTarget = "Car Bluetooth Stereo (A2DP)";
-                                        });
-                                        SettingsStorageService().saveAudioOutputTarget("Car Bluetooth Stereo (A2DP)");
-                                        Navigator.pop(context);
+                                      onPressed: bt.isConnecting ? null : () async {
+                                        final nav = Navigator.of(context);
+                                        final ok = await bt.pairAndConnect(dev.macAddress);
+                                        if (ok && mounted) {
+                                          setState(() {
+                                            _audioOutputTarget = "Car Bluetooth Stereo (A2DP)";
+                                          });
+                                          SettingsStorageService().saveAudioOutputTarget("Car Bluetooth Stereo (A2DP)");
+                                          nav.pop();
+                                        }
                                       },
-                                      child: Text("Connect", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                                      child: bt.isConnecting && bt.connectingMacAddress == dev.macAddress
+                                          ? const SizedBox(
+                                              width: 14,
+                                              height: 14,
+                                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                                            )
+                                          : Text("Connect", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
                                     ),
                             );
                           }),
@@ -1066,67 +1098,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showCarBluetoothConnectDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AutomotiveColors.glassPanel,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: AutomotiveColors.stroke, width: 1.0),
-          ),
-          title: Row(
-            children: [
-              const Icon(Icons.bluetooth_audio_rounded, color: AutomotiveColors.electricCyan),
-              const SizedBox(width: 10),
-              Text(
-                "Connect to Car's Bluetooth",
-                style: GoogleFonts.spaceGrotesk(color: AutomotiveColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Audio output target set to Car Bluetooth Stereo (A2DP).",
-                style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                "Please make sure your vehicle's stereo is powered on and set to Bluetooth receiver mode. HeadUnit OS will stream all music, navigation prompts, and phone calls wirelessly to your car speakers.",
-                style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 12),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                "Cancel",
-                style: GoogleFonts.inter(color: AutomotiveColors.textMuted, fontSize: 12),
-              ),
-            ),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AutomotiveColors.electricCyan,
-                foregroundColor: Colors.black,
-              ),
-              onPressed: () {
-                Navigator.pop(context);
-                _showBluetoothPairingModal();
-              },
-              icon: const Icon(Icons.bluetooth_searching_rounded, size: 16),
-              label: Text("Pair / Connect Device", style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   Widget _buildAudioTargetRadioTile(String target, IconData icon, String subtitle) {
     final bool isSelected = _audioOutputTarget == target;
     return Container(
@@ -1165,7 +1136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             });
             SettingsStorageService().saveAudioOutputTarget(target);
             if (target.contains("Bluetooth")) {
-              _showCarBluetoothConnectDialog();
+              _showBluetoothPairingModal();
             } else if (target.contains("FM Transmitter")) {
               context.read<FmTransmitterProvider>().toggleTransmitter(true);
             }
