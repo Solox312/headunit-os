@@ -38,6 +38,30 @@ void main() {
       expect(loaded, equals('AUX Cable / 3.5mm DAC'));
     });
 
+    test('saveUse24HourFormat and loadUse24HourFormat persists 24-hour setting', () async {
+      final storage = SettingsStorageService();
+      await storage.saveUse24HourFormat(true);
+
+      final loaded = await storage.loadUse24HourFormat();
+      expect(loaded, isTrue);
+    });
+
+    test('saveShowSeconds and loadShowSeconds persists show seconds setting', () async {
+      final storage = SettingsStorageService();
+      await storage.saveShowSeconds(false);
+
+      final loaded = await storage.loadShowSeconds();
+      expect(loaded, isFalse);
+    });
+
+    test('saveDateFormatPattern and loadDateFormatPattern persists pattern', () async {
+      final storage = SettingsStorageService();
+      await storage.saveDateFormatPattern('yyyy-MM-dd');
+
+      final loaded = await storage.loadDateFormatPattern();
+      expect(loaded, equals('yyyy-MM-dd'));
+    });
+
     test('VehicleProvider updateDriverName capitalizes lowercase names', () async {
       final provider = VehicleProvider();
       await provider.updateDriverName('carl smith');

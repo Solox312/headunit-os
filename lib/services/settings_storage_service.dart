@@ -166,4 +166,47 @@ class SettingsStorageService {
     }
     return 'AUX Cable / 3.5mm DAC';
   }
+
+  /// Helper to save 24-hour clock setting.
+  Future<void> saveUse24HourFormat(bool is24Hour) async {
+    await saveSettings({'use24HourFormat': is24Hour});
+  }
+
+  /// Helper to read 24-hour clock setting (defaults to false / 12-Hour).
+  Future<bool> loadUse24HourFormat() async {
+    final settings = await loadSettings();
+    if (settings.containsKey('use24HourFormat') && settings['use24HourFormat'] is bool) {
+      return settings['use24HourFormat'] as bool;
+    }
+    return false;
+  }
+
+  /// Helper to save show seconds setting.
+  Future<void> saveShowSeconds(bool showSeconds) async {
+    await saveSettings({'showSeconds': showSeconds});
+  }
+
+  /// Helper to read show seconds setting (defaults to true).
+  Future<bool> loadShowSeconds() async {
+    final settings = await loadSettings();
+    if (settings.containsKey('showSeconds') && settings['showSeconds'] is bool) {
+      return settings['showSeconds'] as bool;
+    }
+    return true;
+  }
+
+  /// Helper to save date format pattern.
+  Future<void> saveDateFormatPattern(String pattern) async {
+    await saveSettings({'dateFormatPattern': pattern});
+  }
+
+  /// Helper to read date format pattern (defaults to 'EEEE, MMMM d, yyyy').
+  Future<String> loadDateFormatPattern() async {
+    final settings = await loadSettings();
+    if (settings.containsKey('dateFormatPattern') && settings['dateFormatPattern'] is String) {
+      final pattern = (settings['dateFormatPattern'] as String).trim();
+      if (pattern.isNotEmpty) return pattern;
+    }
+    return 'EEEE, MMMM d, yyyy';
+  }
 }

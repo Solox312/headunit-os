@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import 'dart:async';
 import '../theme/automotive_colors.dart';
 import '../widgets/glass_card.dart';
@@ -10,6 +9,7 @@ import '../providers/projection_provider.dart';
 import '../providers/wifi_provider.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/keyboard_provider.dart';
+import '../providers/time_date_provider.dart';
 import '../models/projection_state.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -27,15 +27,19 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  late String _timeString;
-  late String _dateString;
+  DateTime _now = DateTime.now();
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _updateTime();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateTime());
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {
+          _now = DateTime.now();
+        });
+      }
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -46,16 +50,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _showEditDriverNameDialog(context, vehicle);
       }
     });
-  }
-
-  void _updateTime() {
-    if (mounted) {
-      final now = DateTime.now();
-      setState(() {
-        _timeString = DateFormat('h:mm:ss a').format(now);
-        _dateString = DateFormat('EEEE, MMMM d, yyyy').format(now);
-      });
-    }
   }
 
   @override
@@ -196,23 +190,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 },
                               ),
                               const SizedBox(height: 24),
-                              Text(
-                                _timeString,
-                                style: GoogleFonts.spaceGrotesk(
-                                  fontSize: 38,
-                                  fontWeight: FontWeight.bold,
-                                  color: AutomotiveColors.textPrimary,
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _dateString,
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: AutomotiveColors.electricCyan,
-                                ),
+                              Consumer<TimeDateProvider>(
+                                builder: (context, timeDate, _) {
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        timeDate.formatTime(_now, withSeconds: timeDate.showSeconds),
+                                        style: GoogleFonts.spaceGrotesk(
+                                          fontSize: 38,
+                                          fontWeight: FontWeight.bold,
+                                          color: AutomotiveColors.textPrimary,
+                                          letterSpacing: -0.5,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        timeDate.formatDate(_now),
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          color: AutomotiveColors.electricCyan,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
                               ),
                               const SizedBox(height: 20),
                               const Divider(color: AutomotiveColors.strokeSoft),

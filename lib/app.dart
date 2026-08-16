@@ -12,6 +12,7 @@ import 'providers/update_provider.dart';
 import 'providers/fm_transmitter_provider.dart';
 import 'providers/display_provider.dart';
 import 'providers/keyboard_provider.dart';
+import 'providers/time_date_provider.dart';
 import 'widgets/virtual_keyboard.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_navigation_screen.dart';
@@ -87,6 +88,7 @@ class RpiHeadunitApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FmTransmitterProvider()),
         ChangeNotifierProvider(create: (_) => DisplayProvider()),
         ChangeNotifierProvider(create: (_) => KeyboardProvider()),
+        ChangeNotifierProvider(create: (_) => TimeDateProvider()),
       ],
       child: MaterialApp(
         title: 'HeadUnit OS',

@@ -12,6 +12,7 @@ import '../services/system_info_service.dart';
 import '../models/wifi_network.dart';
 import '../providers/update_provider.dart';
 import '../services/settings_storage_service.dart';
+import '../providers/time_date_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -425,6 +426,178 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Text("Reboot Now", style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  Widget _buildTimeDateCard(BuildContext context) {
+    return Consumer<TimeDateProvider>(
+      builder: (context, timeDate, _) {
+        final now = DateTime.now();
+        return GlassCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.access_time_filled_rounded, color: AutomotiveColors.electricCyan),
+                  const SizedBox(width: 10),
+                  Text(
+                    "Date & Time Configuration",
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AutomotiveColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              // Live Clock Preview Banner
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AutomotiveColors.electricCyan.withAlpha(15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AutomotiveColors.electricCyan.withAlpha(80)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.schedule_rounded, color: AutomotiveColors.electricCyan, size: 28),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            timeDate.formatTime(now, withSeconds: timeDate.showSeconds),
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: AutomotiveColors.textPrimary,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            timeDate.formatDate(now),
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AutomotiveColors.electricCyan,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AutomotiveColors.electricCyan.withAlpha(30),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        timeDate.use24HourFormat ? "24-HOUR" : "12-HOUR",
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AutomotiveColors.electricCyan,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              // 24-Hour Switch Tile
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.av_timer_rounded, color: AutomotiveColors.electricCyan),
+                title: Text(
+                  "Use 24-Hour Time Format",
+                  style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  timeDate.use24HourFormat ? "Military time display (e.g. 14:30)" : "Standard 12-hour display with AM/PM (e.g. 2:30 PM)",
+                  style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11),
+                ),
+                value: timeDate.use24HourFormat,
+                activeTrackColor: AutomotiveColors.electricCyan,
+                onChanged: (val) => timeDate.setUse24HourFormat(val),
+              ),
+              const Divider(color: AutomotiveColors.strokeSoft),
+              // Show Seconds Switch Tile
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.timer_outlined, color: AutomotiveColors.electricCyan),
+                title: Text(
+                  "Show Seconds on Dashboard Clock",
+                  style: GoogleFonts.inter(color: AutomotiveColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  timeDate.showSeconds ? "Display running seconds on dashboard clock" : "Display hours and minutes only",
+                  style: GoogleFonts.inter(color: AutomotiveColors.textSecondary, fontSize: 11),
+                ),
+                value: timeDate.showSeconds,
+                activeTrackColor: AutomotiveColors.electricCyan,
+                onChanged: (val) => timeDate.setShowSeconds(val),
+              ),
+              const Divider(color: AutomotiveColors.strokeSoft),
+              const SizedBox(height: 6),
+              Text(
+                "DATE DISPLAY FORMAT",
+                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: AutomotiveColors.textSecondary, letterSpacing: 0.5),
+              ),
+              const SizedBox(height: 8),
+              // Date format option list
+              ...TimeDateProvider.availableDateFormats.map((opt) {
+                final bool isSelected = timeDate.dateFormatPattern == opt.pattern;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AutomotiveColors.electricCyan.withAlpha(20) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.strokeSoft,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                      dense: true,
+                      leading: Icon(
+                        Icons.calendar_today_rounded,
+                        size: 18,
+                        color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.textSecondary,
+                      ),
+                      title: Text(
+                        opt.label,
+                        style: GoogleFonts.inter(
+                          color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.textPrimary,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                      ),
+                      subtitle: Text(
+                        opt.formatExample(now),
+                        style: GoogleFonts.jetBrainsMono(
+                          color: isSelected ? AutomotiveColors.textPrimary : AutomotiveColors.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AutomotiveColors.electricCyan, size: 18) : null,
+                      onTap: () => timeDate.setDateFormatPattern(opt.pattern),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
         );
       },
     );
@@ -1114,6 +1287,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 12),
+                  // Date & Time Configuration Card
+                  _buildTimeDateCard(context),
 
                   const SizedBox(height: 12),
                   // Dedicated Audio Output & Sound Routing Card

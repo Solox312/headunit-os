@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import 'dart:async';
 import '../theme/automotive_colors.dart';
 import '../providers/projection_provider.dart';
 import '../providers/wifi_provider.dart';
 import '../providers/bluetooth_provider.dart';
+import '../providers/time_date_provider.dart';
 import '../models/projection_state.dart';
 
 class NavDock extends StatefulWidget {
@@ -24,22 +24,19 @@ class NavDock extends StatefulWidget {
 }
 
 class _NavDockState extends State<NavDock> {
-  late String _currentTime;
+  DateTime _now = DateTime.now();
   Timer? _timeTimer;
 
   @override
   void initState() {
     super.initState();
-    _updateTime();
-    _timeTimer = Timer.periodic(const Duration(seconds: 1), (_) => _updateTime());
-  }
-
-  void _updateTime() {
-    if (mounted) {
-      setState(() {
-        _currentTime = DateFormat('h:mm a').format(DateTime.now());
-      });
-    }
+    _timeTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {
+          _now = DateTime.now();
+        });
+      }
+    });
   }
 
   @override
@@ -102,13 +99,17 @@ class _NavDockState extends State<NavDock> {
           ),
           const SizedBox(height: 8),
           // Data Monospace Clock
-          Text(
-            _currentTime,
-            style: GoogleFonts.jetBrainsMono(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: AutomotiveColors.textSecondary,
-            ),
+          Consumer<TimeDateProvider>(
+            builder: (context, timeDate, _) {
+              return Text(
+                timeDate.formatTime(_now, withSeconds: false),
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: AutomotiveColors.textSecondary,
+                ),
+              );
+            },
           ),
           const SizedBox(height: 6),
           // Status Indicators Row (Wi-Fi & Bluetooth)
