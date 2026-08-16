@@ -280,7 +280,7 @@ def update_openauto_recent_ip():
                     except Exception:
                         pass
                 emit(f"OPENAUTO_RECENT_IP_SAVED {phone_ip}")
-                subprocess.Popen(["sudo", "systemctl", "start", "openauto.service"])
+                subprocess.Popen(["sudo", "systemctl", "restart", "openauto.service"])
                 emit("OPENAUTO_PROJECTION_STARTED")
                 break
     except Exception as exc:
