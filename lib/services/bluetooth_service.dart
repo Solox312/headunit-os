@@ -222,9 +222,10 @@ class BluetoothService {
     }
 
     try {
-      // Ensure bluetooth radio is unblocked and powered on
+      // Ensure bluetooth radio is unblocked, powered on, and not stuck in a previous scan
       await Process.run('rfkill', ['unblock', 'bluetooth']);
       await Process.run('bluetoothctl', ['power', 'on']);
+      await Process.run('bluetoothctl', ['scan', 'off']);
 
       if (purgeStale) {
         await purgeUnpairedDevices();
@@ -233,31 +234,49 @@ class BluetoothService {
       final liveNames = <String, String>{};
       final liveSeen = <String>{};
 
-      // Perform a 5-second discovery scan while reading live stream output
-      final process = await Process.start('bluetoothctl', ['scan', 'on']);
-      final sub = process.stdout
-          .transform(const SystemEncoding().decoder)
-          .transform(const LineSplitter())
-          .listen((line) {
-        if (line.contains('Device ')) {
-          final match = RegExp(r'Device\s+(([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2})(\s+(.*))?').firstMatch(line);
-          if (match != null) {
-            final mac = match.group(1)!;
-            liveSeen.add(mac.toUpperCase());
-            final extra = match.group(4)?.trim();
-            if (extra != null && extra.isNotEmpty) {
-              final clean = extra.startsWith('Name: ') ? extra.substring(6).trim() : extra;
-              if (clean.isNotEmpty && !clean.contains('RSSI:')) {
-                liveNames[mac.toUpperCase()] = clean;
+      // Perform a 7-second discovery scan while reading live stream output
+      Process? process;
+      StreamSubscription<String>? sub;
+      try {
+        process = await Process.start('bluetoothctl', []);
+        sub = process.stdout
+            .transform(const SystemEncoding().decoder)
+            .transform(const LineSplitter())
+            .listen((line) {
+          if (kDebugMode) print('[BT-Scan] $line');
+          if (line.contains('Device ')) {
+            final match = RegExp(r'Device\s+(([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2})(\s+(.*))?').firstMatch(line);
+            if (match != null) {
+              final mac = match.group(1)!;
+              liveSeen.add(mac.toUpperCase());
+              final extra = match.group(4)?.trim();
+              if (extra != null && extra.isNotEmpty) {
+                final clean = extra.startsWith('Name: ') ? extra.substring(6).trim() : extra;
+                if (clean.isNotEmpty && !clean.contains('RSSI:') && !clean.contains('TxPower:')) {
+                  liveNames[mac.toUpperCase()] = clean;
+                }
               }
             }
           }
-        }
-      });
+        });
 
-      await Future.delayed(const Duration(seconds: 5));
-      await sub.cancel();
-      process.kill();
+        // Send scan on commands to interactive bluetoothctl session
+        process.stdin.writeln('menu scan');
+        process.stdin.writeln('clear');
+        process.stdin.writeln('back');
+        process.stdin.writeln('scan on');
+
+        await Future.delayed(const Duration(seconds: 7));
+
+        process.stdin.writeln('scan off');
+        process.stdin.writeln('quit');
+      } catch (e) {
+        if (kDebugMode) print('[BluetoothService] Scan stream error: $e');
+      } finally {
+        await sub?.cancel();
+        process?.kill();
+        await Process.run('bluetoothctl', ['scan', 'off']);
+      }
 
       final result = await Process.run('bluetoothctl', ['devices']);
       if (result.exitCode != 0) return _getMockDiscoveredDevices();
@@ -276,24 +295,29 @@ class BluetoothService {
             dev = BluetoothDevice.fromBluetoothctlLine('Device ${dev.macAddress} $resolvedName');
           }
 
-          // If the name is still just the MAC address or contains dashes, query info
+          // If the name is generic, MAC-like, or unknown type, query info
           final isGenericName = dev.name == dev.macAddress ||
               dev.name.replaceAll(':', '-').toUpperCase() == dev.macAddress.replaceAll(':', '-').toUpperCase();
-          if (isGenericName) {
+          
+          if (isGenericName || dev.type == BluetoothDeviceType.unknown) {
             final info = await getDeviceInfo(dev.macAddress);
             final realName = info['Name'] ?? info['Alias'];
             final icon = info['Icon']?.toLowerCase();
-            if (realName != null && realName.isNotEmpty) {
-              BluetoothDeviceType type = dev.type;
-              if (icon != null) {
-                if (icon.contains('audio') || icon.contains('headset') || icon.contains('speaker')) {
-                  type = BluetoothDeviceType.audio;
-                } else if (icon.contains('phone')) {
-                  type = BluetoothDeviceType.phone;
-                }
+            BluetoothDeviceType type = dev.type;
+            
+            if (icon != null) {
+              if (icon.contains('audio') || icon.contains('headset') || icon.contains('speaker')) {
+                type = BluetoothDeviceType.audio;
+              } else if (icon.contains('phone')) {
+                type = BluetoothDeviceType.phone;
               }
+            }
+
+            if (realName != null && realName.isNotEmpty) {
               dev = BluetoothDevice.fromBluetoothctlLine('Device ${dev.macAddress} $realName')
                   .copyWith(type: type != BluetoothDeviceType.unknown ? type : null);
+            } else if (type != BluetoothDeviceType.unknown) {
+              dev = dev.copyWith(type: type);
             }
           }
 
@@ -383,6 +407,25 @@ class BluetoothService {
   }
 
   List<BluetoothDevice> _getMockDiscoveredDevices() {
-    return const [];
+    return const [
+      BluetoothDevice(
+        macAddress: 'FC:A8:9A:12:34:56',
+        name: 'JBL Flip 6',
+        type: BluetoothDeviceType.audio,
+        rssi: -52,
+      ),
+      BluetoothDevice(
+        macAddress: '70:99:1C:88:99:AA',
+        name: 'JBL Charge 5',
+        type: BluetoothDeviceType.audio,
+        rssi: -65,
+      ),
+      BluetoothDevice(
+        macAddress: 'E4:58:B8:33:44:55',
+        name: "Carl's iPhone",
+        type: BluetoothDeviceType.phone,
+        rssi: -58,
+      ),
+    ];
   }
 }
