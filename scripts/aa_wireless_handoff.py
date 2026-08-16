@@ -537,18 +537,14 @@ def main():
             profile_obj = AAWirelessProfile(_bus, path, config)
             _profile_objects.append(profile_obj)
             profile_opts = {
-                "Name": "Android Auto Wireless",
-                "Role": "server",
+                "Name": "Android Auto Wireless" if uuid == AA_WIRELESS_UUID else "Serial Port",
                 "RequireAuthentication": dbus.Boolean(False),
                 "RequireAuthorization": dbus.Boolean(False),
                 "Channel": dbus.UInt16(channel_num),
-                "AutoConnect": dbus.Boolean(False),
+                "AutoConnect": dbus.Boolean(True),
             }
             if uuid == AA_WIRELESS_UUID:
                 profile_opts["ServiceRecord"] = aa_service_record
-            else:
-                profile_opts["Service"] = uuid
-                profile_opts["Version"] = dbus.UInt16(0x0102)
 
             manager.RegisterProfile(path, uuid, profile_opts)
             registered_paths.append(path)
