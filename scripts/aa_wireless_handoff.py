@@ -265,6 +265,28 @@ def detect_hotspot_ip(explicit):
     return "192.168.50.1"
 
 
+def update_openauto_recent_ip():
+    try:
+        out = subprocess.check_output(["ip", "-4", "neigh", "show"], text=True, errors="replace")
+        for line in out.splitlines():
+            if "192.168.50." in line:
+                phone_ip = line.split()[0]
+                ini_content = f"[RecentAddresses]\n0={phone_ip}\n"
+                for path in ["/home/carl/openauto_wifi_recent.ini", "/home/carl/.config/openauto/openauto_wifi_recent.ini"]:
+                    try:
+                        os.makedirs(os.path.dirname(path), exist_ok=True)
+                        with open(path, "w") as f:
+                            f.write(ini_content)
+                    except Exception:
+                        pass
+                emit(f"OPENAUTO_RECENT_IP_SAVED {phone_ip}")
+                subprocess.Popen(["sudo", "systemctl", "start", "openauto.service"])
+                emit("OPENAUTO_PROJECTION_STARTED")
+                break
+    except Exception as exc:
+        emit(f"WARN openauto ip sync: {exc}")
+
+
 def handle_connection(fd, config, device_path):
     credentials_sent = False
     try:
@@ -313,9 +335,10 @@ def handle_connection(fd, config, device_path):
                 credentials_sent = True
                 emit(f"CREDENTIALS_SENT ssid={config.ssid} bssid={bssid}")
             elif msg_id == MSG_WIFI_START_RESPONSE:
-                emit("WIFI_START_RESPONSE")
+                 emit("WIFI_START_RESPONSE")
             elif msg_id == MSG_WIFI_CONNECT_STATUS:
-                emit(f"WIFI_CONNECT_STATUS len={len(payload)}")
+                 emit(f"WIFI_CONNECT_STATUS len={len(payload)}")
+                 threading.Timer(1.5, update_openauto_recent_ip).start()
             elif msg_id == MSG_WIFI_PING_REQUEST:
                 write_frame(fd, MSG_WIFI_PING_RESPONSE, b"")
                 emit("PING_REPLIED")
