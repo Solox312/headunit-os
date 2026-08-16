@@ -352,7 +352,8 @@ def _advertised_candidates(device_path):
         advertised = {str(u).lower() for u in props.Get("org.bluez.Device1", "UUIDs")}
     except dbus.exceptions.DBusException:
         advertised = set()
-    return [u for u in AA_UUID_CANDIDATES if u in advertised]
+    preferred = [u for u in AA_UUID_CANDIDATES if u in advertised]
+    return preferred if preferred else list(AA_UUID_CANDIDATES)
 
 
 def _connect_loop(device_path):
@@ -369,10 +370,6 @@ def _connect_loop(device_path):
             time.sleep(0.5)
 
         candidates = _advertised_candidates(device_path)
-        if not candidates:
-            emit(f"WAITING_FOR_PHONE_INBOUND {device_path} (Head Unit RFCOMM listening on Channel 22)")
-            return
-
         emit(f"PHONE_SEEN {device_path} candidates={','.join(candidates)}")
 
         for attempt in range(1, CONNECT_ATTEMPTS + 1):
@@ -498,7 +495,6 @@ def main():
             AAWirelessProfile(_bus, path, config)
             profile_opts = {
                 "Name": "Android Auto Wireless" if uuid == AA_WIRELESS_UUID else "Serial Port",
-                "Role": "server",
                 "RequireAuthentication": dbus.Boolean(False),
                 "RequireAuthorization": dbus.Boolean(False),
                 "Channel": dbus.UInt16(channel_num),
