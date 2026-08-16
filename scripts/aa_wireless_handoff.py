@@ -428,16 +428,61 @@ def connect_already_connected_devices():
             start_connect_loop(str(path))
 
 
-# ── BlueZ Profile1 implementation ─────────────────────────────────────────────
+# ── RFCOMM socket server ───────────────────────────────────────────────────────
+# Raw kernel RFCOMM socket on Channel 22. The kernel automatically registers
+# an SDP entry (Serial Port Profile) visible via `sdptool browse local`.
+# The phone connects to this channel when Android Auto detects our car class.
+
+RFCOMM_CHANNEL = 22
+AF_BLUETOOTH = socket.AF_BLUETOOTH   # 31
+BTPROTO_RFCOMM = 3
+
+
+def rfcomm_server_thread(config):
+    """Background thread: accept phone connections on RFCOMM Channel 22."""
+    try:
+        server_sock = socket.socket(AF_BLUETOOTH, socket.SOCK_STREAM, BTPROTO_RFCOMM)
+        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # Bind to any adapter, channel 22
+        server_sock.bind(("", RFCOMM_CHANNEL))
+        server_sock.listen(3)
+        emit(f"RFCOMM_SERVER_LISTENING channel={RFCOMM_CHANNEL}")
+    except OSError as e:
+        emit(f"RFCOMM_BIND_ERROR {e}")
+        return
+
+    while True:
+        try:
+            client_sock, (addr, channel) = server_sock.accept()
+            emit(f"RFCOMM_CLIENT_CONNECTED addr={addr} channel={channel}")
+            # Derive D-Bus style path for downstream log compatibility
+            device_path = "/org/bluez/hci0/dev_" + addr.replace(":", "_").upper()
+            with _lock:
+                _active_devices.add(device_path)
+            # Duplicate the fd so we can close client_sock independently
+            raw_fd = os.dup(client_sock.fileno())
+            client_sock.close()
+            threading.Thread(
+                target=handle_connection,
+                args=(raw_fd, config, device_path),
+                daemon=True,
+            ).start()
+        except OSError as e:
+            emit(f"RFCOMM_ACCEPT_ERROR {e}")
+            break
+
+
+# ── BlueZ Profile1 implementation (secondary path, raw RFCOMM socket is primary) ─
 
 class AAWirelessProfile(dbus.service.Object):
+    """BlueZ Profile1 handler — used when phone dials us via ConnectProfile."""
     def __init__(self, bus, path, config):
         super().__init__(bus, path)
         self._config = config
 
     @dbus.service.method("org.bluez.Profile1", in_signature="oha{sv}", out_signature="")
     def NewConnection(self, device, fd, fd_properties):
-        raw_fd = fd.take()  # take ownership so BlueZ doesn't close it under us
+        raw_fd = fd.take()
         device_path = str(device)
         with _lock:
             _active_devices.add(device_path)
@@ -464,7 +509,7 @@ def main():
                         help="Fallback head unit IP if live detection from the "
                              "wireless interface fails (auto-detected per-connection "
                              "otherwise — nmcli's shared-mode IP is not reliably "
-                             "10.42.0.1 on real hardware)")
+                             "192.168.50.1 on real hardware)")
     parser.add_argument("--port", type=int, default=50001)
     parser.add_argument("--bssid", default=None, help="Hotspot BSSID (auto-detected if omitted)")
     config = parser.parse_args()
@@ -472,32 +517,28 @@ def main():
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     _bus = dbus.SystemBus()
 
+    # ── Primary: raw RFCOMM socket server (kernel registers SDP automatically) ──
+    threading.Thread(target=rfcomm_server_thread, args=(config,), daemon=True).start()
+
+    # ── Secondary: BlueZ RegisterProfile (enables head-unit-initiated connect) ──
     manager = dbus.Interface(_bus.get_object("org.bluez", "/org/bluez"),
                              "org.bluez.ProfileManager1")
 
-    # One profile object per candidate UUID with assigned RFCOMM Server Channels
-    # so the phone's SDP discovery sees our open RFCOMM listener.
     registered_paths = []
-    channels = {
-        AA_WIRELESS_UUID: 22,
+    profile_map = {
+        AA_WIRELESS_UUID: RFCOMM_CHANNEL,
         SPP_UUID: 1,
-        GOOGLE_AA_UUID: 23,
     }
-
-    for index, uuid in enumerate(AA_UUID_CANDIDATES):
+    for index, (uuid, channel_num) in enumerate(profile_map.items()):
         path = f"{PROFILE_PATH}{index}"
-        channel_num = channels.get(uuid, 22 + index)
-        
-        # Try unregistering stale profile first
         try:
             manager.UnregisterProfile(path)
         except Exception:
             pass
-
         try:
             AAWirelessProfile(_bus, path, config)
             profile_opts = {
-                "Name": "Android Auto Wireless" if uuid == AA_WIRELESS_UUID else "Serial Port",
+                "Name": "Android Auto Wireless",
                 "RequireAuthentication": dbus.Boolean(False),
                 "RequireAuthorization": dbus.Boolean(False),
                 "Channel": dbus.UInt16(channel_num),
@@ -507,18 +548,14 @@ def main():
             registered_paths.append(path)
             emit(f"PROFILE_REGISTERED uuid={uuid} channel={channel_num}")
         except dbus.exceptions.DBusException as exc:
-            if "already registered" in str(exc).lower() or "notpermitted" in str(exc).lower():
-                # Profile is already active in BlueZ, treat as registered
+            msg = str(exc).lower()
+            if "already registered" in msg or "notpermitted" in msg:
                 registered_paths.append(path)
                 emit(f"PROFILE_ALREADY_ACTIVE uuid={uuid} channel={channel_num}")
             else:
                 emit(f"PROFILE_REGISTER_FAILED uuid={uuid} error={exc}")
 
-    if not registered_paths:
-        emit("ERROR no AA profile could be registered")
-        sys.exit(1)
-
-    # Watch for phones connecting, and dial any phone that's already here.
+    # ── Watch for phones connecting ────────────────────────────────────────────
     _bus.add_signal_receiver(
         on_properties_changed,
         dbus_interface="org.freedesktop.DBus.Properties",

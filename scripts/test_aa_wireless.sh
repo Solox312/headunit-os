@@ -65,14 +65,15 @@ else
   sleep 1
 fi
 
-# Ensure BlueZ is running with --compat for legacy SDP advertisement
+# Ensure BlueZ is running with -C (compat) for legacy SDP advertisement
 BT_SERVICE_FILE=""
 for f in /lib/systemd/system/bluetooth.service /usr/lib/systemd/system/bluetooth.service; do
   [ -f "$f" ] && BT_SERVICE_FILE="$f" && break
 done
-if [ -n "$BT_SERVICE_FILE" ] && ! ps aux | grep -v grep | grep -q "bluetoothd.*--compat"; then
-  echo -e "  ${YELLOW}Enabling BlueZ SDP compatibility mode (--compat)...${NC}"
-  sudo sed -i 's|^ExecStart=.*bluetoothd.*|ExecStart=/usr/lib/bluetooth/bluetoothd --compat|' "$BT_SERVICE_FILE" 2>/dev/null || true
+BT_BIN=$(command -v bluetoothd 2>/dev/null || ls /usr/libexec/bluetooth/bluetoothd /usr/lib/bluetooth/bluetoothd 2>/dev/null | head -1)
+if [ -n "$BT_SERVICE_FILE" ] && [ -n "$BT_BIN" ] && ! ps aux | grep -v grep | grep -q "bluetoothd.*-C\|bluetoothd.*--compat"; then
+  echo -e "  ${YELLOW}Enabling BlueZ SDP compatibility mode (-C)...${NC}"
+  sudo sed -i "s|^ExecStart=.*bluetoothd.*|ExecStart=${BT_BIN} -C|" "$BT_SERVICE_FILE" 2>/dev/null || true
   sudo systemctl daemon-reload
   sudo systemctl restart bluetooth
   sleep 2
