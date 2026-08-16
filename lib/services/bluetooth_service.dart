@@ -338,14 +338,21 @@ class BluetoothService {
     }
   }
 
-  /// Routes Linux PulseAudio / PipeWire audio output to the newly connected Bluetooth speaker.
+  /// Routes Linux PulseAudio / PipeWire audio output to the newly connected Bluetooth speaker
+  /// and locks the A2DP profile to prevent the 2-second timeout disconnect loop.
   Future<void> _routeAudioToBluetoothSpeaker(String macAddress) async {
     if (!Platform.isLinux) return;
     try {
       final macUnderscore = macAddress.replaceAll(':', '_').toUpperCase();
       final macLower = macAddress.replaceAll(':', '_').toLowerCase();
 
-      // PulseAudio route
+      // Lock PulseAudio card profile to a2dp_sink / a2dp_source so BlueZ does not drop the link
+      await Process.run('pactl', ['set-card-profile', 'bluez_card.$macUnderscore', 'a2dp_sink']);
+      await Process.run('pactl', ['set-card-profile', 'bluez_card.$macLower', 'a2dp_sink']);
+      await Process.run('pactl', ['set-card-profile', 'bluez_card.$macUnderscore', 'a2dp_source']);
+      await Process.run('pactl', ['set-card-profile', 'bluez_card.$macLower', 'a2dp_source']);
+
+      // PulseAudio default sink route
       final sinksResult = await Process.run('pactl', ['list', 'sinks', 'short']);
       if (sinksResult.exitCode == 0) {
         final sinkLines = sinksResult.stdout.toString().split('\n');
@@ -362,7 +369,7 @@ class BluetoothService {
         }
       }
 
-      // PipeWire / WirePlumber route
+      // PipeWire / WirePlumber default sink route
       final wpResult = await Process.run('wpctl', ['status']);
       if (wpResult.exitCode == 0) {
         final wpLines = wpResult.stdout.toString().split('\n');
@@ -396,12 +403,9 @@ class BluetoothService {
       await Process.run('rfkill', ['unblock', 'bluetooth']);
       await Process.run('bluetoothctl', ['power', 'on']);
 
-      // Forward trust & pair commands to persistent agent process
-      _persistentAgentProcess?.stdin.writeln('trust $macAddress');
-      _persistentAgentProcess?.stdin.writeln('pair $macAddress');
-
-      // Step 1: Trust device first so BlueZ allows incoming and outgoing handshakes without rejection
+      // Step 1: Trust device first so BlueZ accepts incoming/outgoing audio handshakes
       await Process.run('bluetoothctl', ['trust', macAddress]);
+      _persistentAgentProcess?.stdin.writeln('trust $macAddress');
 
       // Step 2: Attempt pairing (ignore if already paired / bond already exists)
       final pairResult = await Process.run('bluetoothctl', ['pair', macAddress]);
@@ -409,60 +413,36 @@ class BluetoothService {
         print('[BluetoothService] pair ($macAddress) exitCode: ${pairResult.exitCode}, out: ${pairResult.stdout.toString().trim()}');
       }
 
-      // Step 3: Brief delay for Service Discovery Protocol (SDP) and A2DP sink endpoint creation
+      // Step 3: Brief delay for Service Discovery Protocol (SDP) and A2DP profile registration
       await Future.delayed(const Duration(milliseconds: 1000));
 
       // Step 4: Ensure trusted
       await Process.run('bluetoothctl', ['trust', macAddress]);
-      _persistentAgentProcess?.stdin.writeln('trust $macAddress');
-      _persistentAgentProcess?.stdin.writeln('connect $macAddress');
 
-      // Step 5: Connect with retry loop (up to 3 attempts for slow-connecting Bluetooth speakers)
-      for (int attempt = 1; attempt <= 3; attempt++) {
-        if (kDebugMode) print('[BluetoothService] Connection attempt $attempt to $macAddress...');
-        final connResult = await Process.run('bluetoothctl', ['connect', macAddress]);
-        final connOutput = connResult.stdout.toString().toLowerCase();
-
-        if (kDebugMode) {
-          print('[BluetoothService] connect attempt $attempt out: $connOutput');
-        }
-
-        await Future.delayed(const Duration(milliseconds: 1200));
-
-        // Check if device is reported as connected
-        if (await _isDeviceConnected(macAddress)) {
-          if (kDebugMode) print('[BluetoothService] Connected to $macAddress successfully!');
-          await _routeAudioToBluetoothSpeaker(macAddress);
-          return true;
-        }
-
-        if (connResult.exitCode == 0 && (connOutput.contains('successful') || connOutput.contains('connected: yes'))) {
-          await _routeAudioToBluetoothSpeaker(macAddress);
-          return true;
-        }
+      // Step 5: Connect once and immediately lock audio card profile
+      final connResult = await Process.run('bluetoothctl', ['connect', macAddress]);
+      if (kDebugMode) {
+        print('[BluetoothService] connect ($macAddress) exitCode: ${connResult.exitCode}, out: ${connResult.stdout.toString().trim()}');
       }
 
-      // Fallback: If pairing state was corrupted/stale in BlueZ, remove bond and do a fresh 1-shot connect
-      if (!await _isDeviceConnected(macAddress)) {
-        if (kDebugMode) print('[BluetoothService] Retrying fresh handshake after clearing bond cache...');
-        await Process.run('bluetoothctl', ['remove', macAddress]);
-        await Future.delayed(const Duration(milliseconds: 500));
-        await Process.run('bluetoothctl', ['trust', macAddress]);
-        await Process.run('bluetoothctl', ['pair', macAddress]);
-        await Future.delayed(const Duration(milliseconds: 800));
-        final retryConn = await Process.run('bluetoothctl', ['connect', macAddress]);
-        if (retryConn.exitCode == 0 || await _isDeviceConnected(macAddress)) {
-          await _routeAudioToBluetoothSpeaker(macAddress);
-          return true;
-        }
+      // Allow 1.5s for audio sink endpoint to bind in kernel
+      await Future.delayed(const Duration(milliseconds: 1500));
+
+      // Lock audio routing and card profile to stop BlueZ from dropping idle link
+      await _routeAudioToBluetoothSpeaker(macAddress);
+
+      // Verify connection state
+      if (await _isDeviceConnected(macAddress)) {
+        if (kDebugMode) print('[BluetoothService] Device $macAddress successfully connected & audio routed!');
+        return true;
       }
 
-      // Final check in case connection established async
-      final isConnected = await _isDeviceConnected(macAddress);
-      if (isConnected) {
-        await _routeAudioToBluetoothSpeaker(macAddress);
-      }
-      return isConnected;
+      // Fallback: If device requires secondary connect attempt after profile registration
+      final retryConn = await Process.run('bluetoothctl', ['connect', macAddress]);
+      await Future.delayed(const Duration(milliseconds: 1500));
+      await _routeAudioToBluetoothSpeaker(macAddress);
+
+      return retryConn.exitCode == 0 || await _isDeviceConnected(macAddress);
     } catch (e) {
       if (kDebugMode) print('[BluetoothService] pairAndConnect exception: $e');
       return false;

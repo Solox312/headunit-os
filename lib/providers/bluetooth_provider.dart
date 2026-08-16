@@ -83,19 +83,26 @@ class BluetoothProvider extends ChangeNotifier {
 
   void _startPollingTimer() {
     _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
       if (_isBluetoothEnabled && !_isScanning && !_isConnecting) {
         await refreshPairedDevices();
 
-        // Query connected devices directly via bluetoothctl — more reliable than
-        // checking connectedDevice from the paired list, which may be empty if
-        // the device connected without going through the formal pair flow.
+        // Query connected devices directly via bluetoothctl
         final connectedMac = await _getDirectlyConnectedMac();
 
         if (connectedMac != null && connectedMac != _lastConnectedMac) {
           _lastConnectedMac = connectedMac;
-          _avrcp.startPolling(connectedMac);
-          if (kDebugMode) print('[BluetoothProvider] AVRCP polling started for $connectedMac');
+
+          // Only start AVRCP track polling for phones / media sources, not audio output speakers
+          final dev = _pairedDevices.firstWhere(
+            (d) => d.macAddress.toUpperCase() == connectedMac.toUpperCase(),
+            orElse: () => BluetoothDevice(name: '', macAddress: connectedMac, isConnected: true, type: BluetoothDeviceType.unknown),
+          );
+
+          if (dev.type != BluetoothDeviceType.audio && !dev.name.toLowerCase().contains('jbl') && !dev.name.toLowerCase().contains('speaker')) {
+            _avrcp.startPolling(connectedMac);
+            if (kDebugMode) print('[BluetoothProvider] AVRCP polling started for phone/media source $connectedMac');
+          }
         } else if (connectedMac == null && _lastConnectedMac != null) {
           _lastConnectedMac = null;
           _avrcp.stopPolling();
