@@ -97,6 +97,7 @@ _bus = None
 _lock = threading.Lock()
 _active_devices = set()      # device paths with a live handoff link
 _attempting_devices = set()  # device paths with a connect loop in flight
+_profile_objects = []        # keep BlueZ profile D-Bus objects alive (prevent GC)
 
 
 # ── Minimal protobuf encoding ─────────────────────────────────────────────────
@@ -468,10 +469,15 @@ def main():
                              "org.bluez.ProfileManager1")
 
     registered_paths = []
-    # Only the AA Wireless UUID on Channel 22.
-    # Registering SPP on channel 1 causes wrong-channel connections that crash.
+    # Register all three AA-related UUIDs on channel 22.
+    # The phone uses the AA UUID (4de17a00) for SDP discovery but may open the
+    # RFCOMM connection via SPP UUID (00001101) or the Google AA UUID (a3c87600).
+    # Registering all three on the same channel ensures NewConnection fires
+    # regardless of which UUID the phone uses to open the socket.
     profile_map = {
-        AA_WIRELESS_UUID: RFCOMM_CHANNEL,
+        AA_WIRELESS_UUID: RFCOMM_CHANNEL,   # primary: AA UUID
+        SPP_UUID:         RFCOMM_CHANNEL,   # fallback: phone may use SPP UUID
+        GOOGLE_AA_UUID:   RFCOMM_CHANNEL,   # fallback: Google AA UUID
     }
     for index, (uuid, channel_num) in enumerate(profile_map.items()):
         path = f"{PROFILE_PATH}{index}"
@@ -480,7 +486,9 @@ def main():
         except Exception:
             pass
         try:
-            AAWirelessProfile(_bus, path, config)
+            # Store reference to keep the D-Bus object alive (GC must not collect it)
+            profile_obj = AAWirelessProfile(_bus, path, config)
+            _profile_objects.append(profile_obj)
             profile_opts = {
                 "Name": "Android Auto Wireless",
                 "RequireAuthentication": dbus.Boolean(False),
