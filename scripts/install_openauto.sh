@@ -33,6 +33,7 @@ if [[ $EUID -eq 0 ]]; then
   warn "Running as root. Consider running as a regular user (sudo is called internally)."
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="/tmp/headunit_openauto_build"
 INSTALL_PREFIX="/usr/local"
 CONFIG_DIR="$HOME/.config/openauto"
