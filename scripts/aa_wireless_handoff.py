@@ -501,7 +501,9 @@ def main():
             _profile_objects.append(profile_obj)
             profile_opts = {
                 "Name": "Android Auto Wireless",
+                "Service": uuid,
                 "Role": "server",
+                "Version": dbus.UInt16(0x0102),
                 "RequireAuthentication": dbus.Boolean(False),
                 "RequireAuthorization": dbus.Boolean(False),
                 "Channel": dbus.UInt16(channel_num),
