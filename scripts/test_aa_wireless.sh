@@ -65,13 +65,57 @@ else
   sleep 1
 fi
 
-# Ensure BlueZ is running with --compat for SDP service advertisement
-if ! ps aux | grep -v grep | grep -q "bluetoothd.*--compat"; then
+# Ensure BlueZ is running with --compat for legacy SDP advertisement
+BT_SERVICE_FILE=""
+for f in /lib/systemd/system/bluetooth.service /usr/lib/systemd/system/bluetooth.service; do
+  [ -f "$f" ] && BT_SERVICE_FILE="$f" && break
+done
+if [ -n "$BT_SERVICE_FILE" ] && ! ps aux | grep -v grep | grep -q "bluetoothd.*--compat"; then
   echo -e "  ${YELLOW}Enabling BlueZ SDP compatibility mode (--compat)...${NC}"
-  sudo sed -i 's|^ExecStart=.*bluetoothd.*|ExecStart=/usr/lib/bluetooth/bluetoothd --compat|' /lib/systemd/system/bluetooth.service 2>/dev/null || true
+  sudo sed -i 's|^ExecStart=.*bluetoothd.*|ExecStart=/usr/lib/bluetooth/bluetoothd --compat|' "$BT_SERVICE_FILE" 2>/dev/null || true
   sudo systemctl daemon-reload
   sudo systemctl restart bluetooth
-  sleep 1
+  sleep 2
+fi
+
+# Register Android Auto Wireless SDP record on Channel 22 via XML
+AA_SDP_XML="/tmp/heados_aa_sdp.xml"
+cat > "$AA_SDP_XML" << 'SDPEOF'
+<?xml version="1.0" encoding="UTF-8" ?>
+<record>
+  <attribute id="0x0001">
+    <sequence>
+      <uuid value="4de17a00-52cb-11e6-bdf4-0800200c9a66"/>
+    </sequence>
+  </attribute>
+  <attribute id="0x0004">
+    <sequence>
+      <sequence>
+        <uuid value="0x0100"/>
+      </sequence>
+      <sequence>
+        <uuid value="0x0003"/>
+        <uint8 value="22"/>
+      </sequence>
+    </sequence>
+  </attribute>
+  <attribute id="0x0005">
+    <sequence>
+      <uuid value="0x1002"/>
+    </sequence>
+  </attribute>
+  <attribute id="0x0100">
+    <text value="Android Auto Wireless"/>
+  </attribute>
+</record>
+SDPEOF
+
+if command -v sdptool >/dev/null 2>&1; then
+  sudo sdptool add --xml "$AA_SDP_XML" >/dev/null 2>&1 && \
+    echo -e "  [${GREEN}OK${NC}] Android Auto UUID registered in SDP on Channel 22" || \
+    echo -e "  ${YELLOW}[WARN] sdptool XML add failed — trying SP fallback...${NC}"
+  # Also register SPP as fallback
+  sudo sdptool add --channel=22 SP >/dev/null 2>&1 || true
 fi
 
 # Set BT Alias and Discoverability
@@ -79,8 +123,7 @@ bluetoothctl system-alias "HeadUnit-OS" >/dev/null 2>&1 || true
 bluetoothctl power on >/dev/null 2>&1 || true
 bluetoothctl discoverable on >/dev/null 2>&1 || true
 bluetoothctl pairable on >/dev/null 2>&1 || true
-sudo sdptool add --channel=22 SP >/dev/null 2>&1 || true
-echo -e "  [${GREEN}OK${NC}] Bluetooth discoverable as: ${CYAN}HeadUnit-OS${NC} (SDP Channel 22 active)"
+echo -e "  [${GREEN}OK${NC}] Bluetooth discoverable as: ${CYAN}HeadUnit-OS${NC}"
 
 # ── 3. Wi-Fi Hotspot Verification ─────────────────────────────────────────────
 echo ""
