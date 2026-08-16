@@ -515,27 +515,6 @@ def main():
         emit("ERROR no AA profile could be registered")
         sys.exit(1)
 
-    def start_tcp_listener(port):
-        def _tcp_server():
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                s.bind(("0.0.0.0", port))
-                s.listen(1)
-                emit(f"TCP_SERVER_LISTENING on 0.0.0.0:{port}")
-                while True:
-                    conn, addr = s.accept()
-                    emit(f"TCP_PHONE_CONNECTED from {addr[0]}:{addr[1]}")
-                    data = conn.recv(1024)
-                    if data:
-                        emit(f"TCP_RX_DATA len={len(data)} hex={data[:32].hex()}")
-            except Exception as e:
-                emit(f"TCP_SERVER_NOTICE port {port} handled externally ({e})")
-
-        threading.Thread(target=_tcp_server, daemon=True).start()
-
-    start_tcp_listener(config.port)
-
     # Watch for phones connecting, and dial any phone that's already here.
     _bus.add_signal_receiver(
         on_properties_changed,
