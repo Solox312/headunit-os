@@ -608,17 +608,17 @@ new_start = '''    QObject::connect(&connectDialog, &autoapp::ui::ConnectDialog:
     if(!recentAddressesList.getList().empty())
     {
         const std::string ipAddress = recentAddressesList.getList().front();
-        OPENAUTO_LOG(info) << "[autoapp] Auto-connecting wireless to: " << ipAddress;
+        OPENAUTO_LOG(info) << \\"[autoapp] Auto-connecting wireless to: \\" << ipAddress;
         auto socket = std::make_shared<boost::asio::ip::tcp::socket>(ioService);
         tcpWrapper.asyncConnect(*socket, ipAddress, 50001, [&app, socket, ipAddress](const boost::system::error_code& ec) {
             if(!ec)
             {
-                OPENAUTO_LOG(info) << "[autoapp] Connected to wireless device at " << ipAddress;
+                OPENAUTO_LOG(info) << \\"[autoapp] Connected to wireless device at \\" << ipAddress;
                 app->start(std::move(socket));
             }
             else
             {
-                OPENAUTO_LOG(error) << "[autoapp] Wireless connect failed: " << ec.message();
+                OPENAUTO_LOG(error) << \\"[autoapp] Wireless connect failed: \\" << ec.message();
             }
         });
     }
