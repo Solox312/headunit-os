@@ -260,7 +260,7 @@ def detect_hotspot_ip(explicit):
             pass
     if explicit:
         return explicit
-    return "10.42.0.1"
+    return "192.168.50.1"
 
 
 def handle_connection(fd, config, device_path):

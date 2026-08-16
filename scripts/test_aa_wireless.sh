@@ -99,14 +99,18 @@ if ! nmcli connection show "$HOTSPOT_NAME" >/dev/null 2>&1; then
     mode ap \
     802-11-wireless.band a \
     802-11-wireless.channel 36 \
+    ipv4.addresses "192.168.50.1/24" \
     ipv4.method shared \
     wifi-sec.key-mgmt wpa-psk \
     wifi-sec.psk "$HOTSPOT_PASS" \
     autoconnect no
 fi
 
-# Ensure autoconnect is disabled so NetworkManager never connects to it as a client
-sudo nmcli connection modify "$HOTSPOT_NAME" autoconnect no 2>/dev/null || true
+# Ensure dedicated subnet and autoconnect disabled
+sudo nmcli connection modify "$HOTSPOT_NAME" \
+  ipv4.addresses "192.168.50.1/24" \
+  ipv4.method shared \
+  autoconnect no 2>/dev/null || true
 
 echo -e "  Starting hotspot..."
 sudo nmcli connection up "$HOTSPOT_NAME" || {

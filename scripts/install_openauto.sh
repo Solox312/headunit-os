@@ -678,15 +678,17 @@ info "Step 4/6 — Writing OpenAuto configuration..."
 # enum: 1=480p, 2=720p, 3=1080p), FPS=2 means 60fps (VideoFPS enum: 1=30,
 # 2=60) — these are NOT pixel dimensions or literal fps numbers.
 AUTOAPP_WORKDIR="$HOME"
+AA_WIRELESS_PORT="50001"
+
 cat > "$AUTOAPP_WORKDIR/openauto.ini" << EOF
 [General]
 HandednessOfTrafficType=0
 ShowClock=true
 [Video]
 FPS=2
-Resolution=3
+Resolution=2
 ScreenDPI=140
-OMXLayerIndex=1
+OMXLayerIndex=0
 MarginWidth=0
 MarginHeight=0
 [Input]
@@ -697,16 +699,21 @@ AdapterType=0
 OutputBackendType=1
 MusicAudioChannelEnabled=true
 SpeechAudioChannelEnabled=true
+[Wireless]
+WirelessActive=true
 EOF
-success "Config written to $AUTOAPP_WORKDIR/openauto.ini (the file openauto.service's autoapp actually reads)"
-
+cp "$AUTOAPP_WORKDIR/openauto.ini" "$AUTOAPP_WORKDIR/headunit-os/openauto.ini" 2>/dev/null || true
 mkdir -p "$CONFIG_DIR"
+cp "$AUTOAPP_WORKDIR/openauto.ini" "$CONFIG_DIR/openauto.ini" 2>/dev/null || true
+touch "$AUTOAPP_WORKDIR/openauto_wifi_recent.ini" "$CONFIG_DIR/openauto_wifi_recent.ini" 2>/dev/null || true
+success "Config written to $AUTOAPP_WORKDIR/openauto.ini"
+
 cat > "$CONFIG_DIR/openauto_properties.cfg" << EOF
 [Main]
 WirelessEnabled=true
-WirelessPort=${AA_WIRELESS_PORT}
-VideoWidth=1920
-VideoHeight=1080
+WirelessPort=50001
+VideoWidth=1280
+VideoHeight=720
 VideoFPS=60
 VideoCodec=H264
 VideoOutputPort=${AA_VIDEO_PORT}

@@ -193,7 +193,7 @@ class WirelessAABridge {
       scriptPath,
       '--ssid', _hotspotSsid,
       '--psk', _hotspotPassword,
-      '--ip', '10.42.0.1',
+      '--ip', '192.168.50.1',
       '--port', '$_aaTcpPort',
     ]);
 
@@ -270,6 +270,7 @@ class WirelessAABridge {
         'con-name', _hotspotConnectionName,
         'ssid', _hotspotSsid,
         'mode', 'ap',
+        'ipv4.addresses', '192.168.50.1/24',
         'ipv4.method', 'shared',
         'wifi-sec.key-mgmt', 'wpa-psk',
         'wifi-sec.psk', _hotspotPassword,
@@ -280,7 +281,7 @@ class WirelessAABridge {
       }
     }
 
-    await Process.run('sudo', ['nmcli', 'connection', 'modify', _hotspotConnectionName, 'autoconnect', 'no']);
+    await Process.run('sudo', ['nmcli', 'connection', 'modify', _hotspotConnectionName, 'ipv4.addresses', '192.168.50.1/24', 'autoconnect', 'no']);
 
     final up = await Process.run('sudo', ['nmcli', 'connection', 'up', _hotspotConnectionName]);
     if (up.exitCode != 0) {
