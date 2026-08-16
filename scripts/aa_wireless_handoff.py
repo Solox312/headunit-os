@@ -433,6 +433,53 @@ def connect_already_connected_devices():
 RFCOMM_CHANNEL = 22
 
 
+AGENT_PATH = "/org/headunitos/bt_agent"
+
+
+class AutoPairingAgent(dbus.service.Object):
+    """org.bluez.Agent1 implementation that auto-confirms pairing and passkeys."""
+    @dbus.service.method("org.bluez.Agent1", in_signature="", out_signature="")
+    def Release(self):
+        pass
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="os", out_signature="")
+    def AuthorizeService(self, device, uuid):
+        emit(f"AGENT_AUTHORIZE_SERVICE {device} uuid={uuid}")
+        return
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="o", out_signature="s")
+    def RequestPinCode(self, device):
+        emit(f"AGENT_REQUEST_PIN {device} -> 0000")
+        return "0000"
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="o", out_signature="u")
+    def RequestPasskey(self, device):
+        emit(f"AGENT_REQUEST_PASSKEY {device} -> 000000")
+        return dbus.UInt32(0)
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="ou", out_signature="")
+    def DisplayPasskey(self, device, passkey):
+        emit(f"AGENT_DISPLAY_PASSKEY {device} passkey={passkey}")
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="ouq", out_signature="")
+    def DisplayPinCode(self, device, pincode, entered):
+        emit(f"AGENT_DISPLAY_PIN {device} pin={pincode}")
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="ou", out_signature="")
+    def RequestConfirmation(self, device, passkey):
+        emit(f"AGENT_AUTO_CONFIRM_PASSKEY {device} passkey={passkey}")
+        return
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="o", out_signature="")
+    def RequestAuthorization(self, device):
+        emit(f"AGENT_AUTO_AUTHORIZE {device}")
+        return
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="", out_signature="")
+    def Cancel(self):
+        emit("AGENT_CANCEL")
+
+
 # ── BlueZ Profile1 implementation ─────────────────────────────────────────────
 
 class AAWirelessProfile(dbus.service.Object):
@@ -477,6 +524,17 @@ def main():
 
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     _bus = dbus.SystemBus()
+
+    # ── Register built-in BlueZ pairing agent (auto-accepts passkey/PIN) ──────
+    agent_manager = dbus.Interface(_bus.get_object("org.bluez", "/org/bluez"),
+                                   "org.bluez.AgentManager1")
+    agent = AutoPairingAgent(_bus, AGENT_PATH)
+    try:
+        agent_manager.RegisterAgent(AGENT_PATH, "NoInputNoOutput")
+        agent_manager.RequestDefaultAgent(AGENT_PATH)
+        emit("PAIRING_AGENT_REGISTERED capability=NoInputNoOutput")
+    except Exception as exc:
+        emit(f"PAIRING_AGENT_REGISTER_WARN: {exc}")
 
     # ── BlueZ RegisterProfile: handles both phone-initiated and head-unit-initiated ──
     manager = dbus.Interface(_bus.get_object("org.bluez", "/org/bluez"),
