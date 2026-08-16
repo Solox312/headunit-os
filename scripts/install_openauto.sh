@@ -426,7 +426,15 @@ old_enum = '''void App::enumerateDevices()
 }'''
 new_enum = '''void App::enumerateDevices()
 {
-    OPENAUTO_LOG(info) << \"[App] Checking for already connected AOAP accessories...\";
+    OPENAUTO_LOG(info) << \"[App] Checking for wireless and USB devices...\";
+
+    recentAddressesList_.read();
+    if(!recentAddressesList_.getList().empty())
+    {
+        OPENAUTO_LOG(info) << \"[App] Auto-connecting to wireless device: \" << recentAddressesList_.getList().front();
+        this->connectToDevice(recentAddressesList_.getList().front());
+        return;
+    }
 
     auto promise = aasdk::usb::IConnectedAccessoriesEnumerator::Promise::defer(strand_);
     promise->then([this, self = this->shared_from_this()](auto result) {
