@@ -338,51 +338,65 @@ def handle_connection(fd, config, device_path):
 
 # ── Outgoing connection management (head unit dials the phone) ────────────────
 
+def _on_connect_ok(device_path, uuid):
+    emit(f"CONNECT_PROFILE_SUCCESS {device_path} uuid={uuid}")
+
+def _on_connect_err(device_path, uuid, err):
+    name = getattr(err, "get_dbus_name", lambda: "")() or ""
+    if "AlreadyConnected" in name or "InProgress" in name:
+        emit(f"CONNECT_PROFILE_ALREADY_CONNECTED {device_path} uuid={uuid}")
+    elif "NotAvailable" in name or "not-supported" in str(err).lower():
+        emit(f"CONNECT_PROFILE_NOT_SUPPORTED {device_path} uuid={uuid}")
+    else:
+        emit(f"CONNECT_PROFILE_FAILED {device_path} uuid={uuid} error={name}: {err}")
+
+def _try_connect_profiles(device_path, candidates, attempt=1):
+    with _lock:
+        if device_path in _active_devices:
+            return False
+
+    try:
+        device = dbus.Interface(_bus.get_object("org.bluez", device_path), "org.bluez.Device1")
+        for uuid in candidates:
+            emit(f"CALLING_CONNECT_PROFILE {device_path} uuid={uuid} attempt={attempt}")
+            device.ConnectProfile(
+                uuid,
+                reply_handler=lambda u=uuid: _on_connect_ok(device_path, u),
+                error_handler=lambda err, u=uuid: _on_connect_err(device_path, u, err),
+                timeout=10,
+            )
+    except Exception as exc:
+        emit(f"ERROR initiating ConnectProfile: {exc}")
+
+    return False  # GLib timeout doesn't repeat automatically
+
+
 def start_connect_loop(device_path):
     with _lock:
         if device_path in _active_devices or device_path in _attempting_devices:
             return
         _attempting_devices.add(device_path)
-    threading.Thread(target=_connect_loop, args=(device_path,), daemon=True).start()
 
+    def _schedule():
+        try:
+            props = dbus.Interface(_bus.get_object("org.bluez", device_path),
+                                   "org.freedesktop.DBus.Properties")
+            advertised = {str(u).lower() for u in props.Get("org.bluez.Device1", "UUIDs")}
+        except Exception:
+            advertised = set()
+        
+        candidates = [u for u in AA_UUID_CANDIDATES if u in advertised]
+        if not candidates:
+            candidates = list(AA_UUID_CANDIDATES)
 
-def _advertised_candidates(device_path):
-    try:
-        props = dbus.Interface(_bus.get_object("org.bluez", device_path),
-                               "org.freedesktop.DBus.Properties")
-        advertised = {str(u).lower() for u in props.Get("org.bluez.Device1", "UUIDs")}
-    except dbus.exceptions.DBusException:
-        advertised = set()
-    preferred = [u for u in AA_UUID_CANDIDATES if u in advertised]
-    return preferred if preferred else list(AA_UUID_CANDIDATES)
-
-
-def _connect_loop(device_path):
-    """Wait for the phone to call NewConnection on our registered AA profile.
-
-    We no longer call ConnectProfile here: attempting it while the phone is
-    simultaneously connecting to us (phone-initiated) causes a D-Bus deadlock
-    and python-dbus heap corruption.  BlueZ will call NewConnection
-    automatically when the phone opens our RFCOMM channel 22.
-    """
-    try:
-        # Wait up to 6 seconds for ServicesResolved so BlueZ has phone's SDP
-        for _ in range(12):
-            try:
-                props = dbus.Interface(_bus.get_object("org.bluez", device_path),
-                                       "org.freedesktop.DBus.Properties")
-                if bool(props.Get("org.bluez.Device1", "ServicesResolved")):
-                    break
-            except Exception:
-                pass
-            time.sleep(0.5)
-
-        candidates = _advertised_candidates(device_path)
         emit(f"PHONE_SEEN {device_path} candidates={','.join(candidates)}")
-        emit(f"AWAITING_PHONE_INBOUND {device_path} (BlueZ profile on Channel {RFCOMM_CHANNEL})")
-    finally:
-        with _lock:
-            _attempting_devices.discard(device_path)
+        # Trigger async ConnectProfile on the GLib event loop after a short 1s delay for SDP settling
+        GLib.timeout_add(1000, lambda: _try_connect_profiles(device_path, candidates, attempt=1))
+        # Schedule a fallback retry at 3.5s if not yet connected
+        GLib.timeout_add(3500, lambda: _try_connect_profiles(device_path, candidates, attempt=2))
+
+    GLib.idle_add(_schedule)
+
 
 
 def on_properties_changed(interface, changed, invalidated, path=None):

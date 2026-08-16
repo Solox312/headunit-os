@@ -79,43 +79,7 @@ if [ -n "$BT_SERVICE_FILE" ] && [ -n "$BT_BIN" ] && ! ps aux | grep -v grep | gr
   sleep 2
 fi
 
-# Register Android Auto Wireless SDP record on Channel 22 via XML
-AA_SDP_XML="/tmp/heados_aa_sdp.xml"
-cat > "$AA_SDP_XML" << 'SDPEOF'
-<?xml version="1.0" encoding="UTF-8" ?>
-<record>
-  <attribute id="0x0001">
-    <sequence>
-      <uuid value="4de17a00-52cb-11e6-bdf4-0800200c9a66"/>
-    </sequence>
-  </attribute>
-  <attribute id="0x0004">
-    <sequence>
-      <sequence>
-        <uuid value="0x0100"/>
-      </sequence>
-      <sequence>
-        <uuid value="0x0003"/>
-        <uint8 value="22"/>
-      </sequence>
-    </sequence>
-  </attribute>
-  <attribute id="0x0005">
-    <sequence>
-      <uuid value="0x1002"/>
-    </sequence>
-  </attribute>
-  <attribute id="0x0100">
-    <text value="Android Auto Wireless"/>
-  </attribute>
-</record>
-SDPEOF
-
 if command -v sdptool >/dev/null 2>&1; then
-  sudo sdptool add --xml "$AA_SDP_XML" >/dev/null 2>&1 && \
-    echo -e "  [${GREEN}OK${NC}] Android Auto UUID registered in SDP on Channel 22" || \
-    echo -e "  ${YELLOW}[WARN] sdptool XML add failed — trying SP fallback...${NC}"
-  # Also register SPP as fallback
   sudo sdptool add --channel=22 SP >/dev/null 2>&1 || true
 fi
 
