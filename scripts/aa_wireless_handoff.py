@@ -404,7 +404,11 @@ def on_properties_changed(interface, changed, invalidated, path=None):
         if interface != "org.bluez.Device1" or path is None:
             return
         
+        if bool(changed.get("Connected", False)) or bool(changed.get("Paired", False)):
+            set_device_trusted(str(path))
+
         if "ServicesResolved" in changed and bool(changed["ServicesResolved"]):
+            set_device_trusted(str(path))
             try:
                 props = dbus.Interface(_bus.get_object("org.bluez", path), "org.freedesktop.DBus.Properties")
                 uuids = [str(u).lower() for u in props.Get("org.bluez.Device1", "UUIDs")]
@@ -429,7 +433,13 @@ def connect_already_connected_devices():
 
 
 
-RFCOMM_CHANNEL = 22
+def set_device_trusted(device_path):
+    try:
+        props = dbus.Interface(_bus.get_object("org.bluez", device_path), "org.freedesktop.DBus.Properties")
+        props.Set("org.bluez.Device1", "Trusted", dbus.Boolean(True))
+        emit(f"DEVICE_TRUSTED_SET {device_path}")
+    except Exception:
+        pass
 
 
 AGENT_PATH = "/org/headunitos/bt_agent"
@@ -443,34 +453,41 @@ class AutoPairingAgent(dbus.service.Object):
 
     @dbus.service.method("org.bluez.Agent1", in_signature="os", out_signature="")
     def AuthorizeService(self, device, uuid):
+        set_device_trusted(str(device))
         emit(f"AGENT_AUTHORIZE_SERVICE {device} uuid={uuid}")
         return
 
     @dbus.service.method("org.bluez.Agent1", in_signature="o", out_signature="s")
     def RequestPinCode(self, device):
+        set_device_trusted(str(device))
         emit(f"AGENT_REQUEST_PIN {device} -> 0000")
         return "0000"
 
     @dbus.service.method("org.bluez.Agent1", in_signature="o", out_signature="u")
     def RequestPasskey(self, device):
+        set_device_trusted(str(device))
         emit(f"AGENT_REQUEST_PASSKEY {device} -> 000000")
         return dbus.UInt32(0)
 
     @dbus.service.method("org.bluez.Agent1", in_signature="ou", out_signature="")
     def DisplayPasskey(self, device, passkey):
+        set_device_trusted(str(device))
         emit(f"AGENT_DISPLAY_PASSKEY {device} passkey={passkey}")
 
     @dbus.service.method("org.bluez.Agent1", in_signature="ouq", out_signature="")
     def DisplayPinCode(self, device, pincode, entered):
+        set_device_trusted(str(device))
         emit(f"AGENT_DISPLAY_PIN {device} pin={pincode}")
 
     @dbus.service.method("org.bluez.Agent1", in_signature="ou", out_signature="")
     def RequestConfirmation(self, device, passkey):
+        set_device_trusted(str(device))
         emit(f"AGENT_AUTO_CONFIRM_PASSKEY {device} passkey={passkey}")
         return
 
     @dbus.service.method("org.bluez.Agent1", in_signature="o", out_signature="")
     def RequestAuthorization(self, device):
+        set_device_trusted(str(device))
         emit(f"AGENT_AUTO_AUTHORIZE {device}")
         return
 
