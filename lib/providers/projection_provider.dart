@@ -6,6 +6,7 @@ import '../services/android_auto_engine.dart';
 import '../services/projection_bridge.dart';
 import '../services/usb_hotplug_service.dart';
 import '../services/wireless_aa_bridge.dart';
+import '../services/audio_routing_service.dart';
 
 class ProjectionProvider extends ChangeNotifier {
   ProjectionState _state = const ProjectionState();
@@ -91,6 +92,7 @@ class ProjectionProvider extends ChangeNotifier {
     );
     notifyListeners();
 
+    await AudioRoutingService().applyAudioRouting(AudioRoutingService().currentTarget);
     await WirelessAABridge().startWirelessAndroidAuto();
   }
 
@@ -128,6 +130,7 @@ class ProjectionProvider extends ChangeNotifier {
           phoneBatteryLevel: (event.data?['phoneBattery'] as int?) ?? 0,
           activeApp: 'Android Auto',
         );
+        AudioRoutingService().applyAudioRouting(AudioRoutingService().currentTarget);
       case AAConnectionStep.idle:
       case AAConnectionStep.error:
         _state = _state.copyWith(
@@ -156,6 +159,7 @@ class ProjectionProvider extends ChangeNotifier {
         connectionType: ConnectionType.wired,
         activeApp: "Android Auto",
       );
+      await AudioRoutingService().applyAudioRouting(AudioRoutingService().currentTarget);
     } else {
       _state = _state.copyWith(
         mode: ProjectionMode.androidAuto,
@@ -205,6 +209,7 @@ class ProjectionProvider extends ChangeNotifier {
   /// Hands the display over to openauto for a wired Android Auto session.
   Future<void> launchWiredAndroidAuto() async {
     if (!Platform.isLinux) return;
+    await AudioRoutingService().applyAudioRouting(AudioRoutingService().currentTarget);
     if (kDebugMode) {
       print('[ProjectionProvider] Handing display over to openauto for full-screen Android Auto…');
     }

@@ -35,36 +35,78 @@ class AudioRoutingService {
 
     try {
       final sinks = await _getAvailableSinks();
+      final cards = await _getAvailableCards();
+
       if (kDebugMode) {
-        print('[AudioRoutingService] Available sinks on system: $sinks');
+        print('[AudioRoutingService] Available sinks: $sinks');
+        print('[AudioRoutingService] Available cards: $cards');
       }
 
       String? targetSink;
 
-      if (target.contains('AUX') || target.contains('3.5mm') || target.contains('FM Transmitter')) {
-        // Find Analog / Headphones / USB Audio / DAC sink
-        targetSink = sinks.firstWhere(
-          (s) => s.contains('analog') || s.contains('headphones') || s.contains('usb') || s.contains('codec') || s.contains('es8316') || s.contains('rk817'),
-          orElse: () => sinks.firstWhere(
-            (s) => !s.contains('bluez') && !s.contains('hdmi'),
-            orElse: () => sinks.isNotEmpty ? sinks.first : '',
-          ),
-        );
-      } else if (target.contains('HDMI')) {
-        // Find HDMI audio sink
-        targetSink = sinks.firstWhere(
-          (s) => s.contains('hdmi'),
-          orElse: () => sinks.isNotEmpty ? sinks.first : '',
-        );
-      } else if (target.contains('Bluetooth')) {
-        // Find BlueZ A2DP output sink
-        targetSink = sinks.firstWhere(
+      final isBluetoothTarget = target.contains('Bluetooth');
+
+      if (isBluetoothTarget) {
+        // User wants Bluetooth audio output -> Enable A2DP profiles on all Bluetooth cards
+        for (final card in cards) {
+          if (card.contains('bluez')) {
+            await Process.run('pactl', ['set-card-profile', card, 'a2dp_sink']);
+            await Process.run('pactl', ['set-card-profile', card, 'a2dp_source']);
+          }
+        }
+
+        // Locate the BlueZ output sink
+        final updatedSinks = await _getAvailableSinks();
+        targetSink = updatedSinks.firstWhere(
           (s) => s.contains('bluez'),
           orElse: () => '',
         );
+
+        if (targetSink.isNotEmpty) {
+          await Process.run('pactl', ['set-sink-mute', targetSink, '0']);
+          await Process.run('pactl', ['set-sink-volume', targetSink, '100%']);
+        }
+      } else {
+        // User selected AUX, HDMI, or FM Transmitter -> Disable Bluetooth A2DP audio playback
+        for (final card in cards) {
+          if (card.contains('bluez')) {
+            // Mute and disable A2DP profile so sound physically CANNOT leak to Bluetooth speaker
+            await Process.run('pactl', ['set-card-profile', card, 'off']);
+            if (kDebugMode) print('[AudioRoutingService] Disabled Bluetooth card audio profile: $card');
+          }
+        }
+
+        // Mute any remaining bluez sinks
+        for (final sink in sinks) {
+          if (sink.contains('bluez')) {
+            await Process.run('pactl', ['set-sink-mute', sink, '1']);
+          }
+        }
+
+        if (target.contains('HDMI')) {
+          // Target HDMI audio sink
+          targetSink = sinks.firstWhere(
+            (s) => s.contains('hdmi'),
+            orElse: () => sinks.isNotEmpty ? sinks.first : '',
+          );
+        } else {
+          // Target Analog / 3.5mm AUX / USB DAC / Codec sink
+          targetSink = sinks.firstWhere(
+            (s) => (s.contains('analog') || s.contains('headphones') || s.contains('usb') || s.contains('codec') || s.contains('es8316') || s.contains('rk817') || s.contains('bcm2835')) && !s.contains('hdmi') && !s.contains('bluez'),
+            orElse: () => sinks.firstWhere(
+              (s) => !s.contains('bluez') && !s.contains('hdmi'),
+              orElse: () => sinks.isNotEmpty ? sinks.first : '',
+            ),
+          );
+        }
+
+        if (targetSink.isNotEmpty) {
+          await Process.run('pactl', ['set-sink-mute', targetSink, '0']);
+          await Process.run('pactl', ['set-sink-volume', targetSink, '100%']);
+        }
       }
 
-      if (targetSink != null && targetSink.isNotEmpty) {
+      if (targetSink.isNotEmpty) {
         // 1. Set default sink in PulseAudio
         await Process.run('pactl', ['set-default-sink', targetSink]);
         if (kDebugMode) {
@@ -87,6 +129,25 @@ class AudioRoutingService {
       if (kDebugMode) print('[AudioRoutingService] Error applying audio routing: $e');
       return false;
     }
+  }
+
+  /// Lists all available audio card names on Linux.
+  Future<List<String>> _getAvailableCards() async {
+    final cards = <String>[];
+    try {
+      final result = await Process.run('pactl', ['list', 'cards', 'short']);
+      if (result.exitCode == 0) {
+        final lines = result.stdout.toString().split('\n');
+        for (final line in lines) {
+          final parts = line.trim().split(RegExp(r'\s+'));
+          if (parts.length >= 2) {
+            final name = parts[1];
+            if (name.isNotEmpty) cards.add(name);
+          }
+        }
+      }
+    } catch (_) {}
+    return cards;
   }
 
   /// Lists all available audio sink names on Linux.
