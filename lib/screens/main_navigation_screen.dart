@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/nav_dock.dart';
 import '../providers/display_provider.dart';
+import '../providers/projection_provider.dart';
 import 'dashboard_screen.dart';
 import 'projection_screen.dart';
 import 'media_screen.dart';
@@ -18,6 +19,7 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   late int _selectedIndex;
+  bool _wasStreaming = false;
 
   @override
   void initState() {
@@ -27,6 +29,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final projection = Provider.of<ProjectionProvider>(context);
+    final isStreaming = projection.state.isConnected && projection.state.isStreaming;
+
+    if (isStreaming && !_wasStreaming) {
+      // Android Auto connected & streaming -> automatically open projection screen (index 1)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _selectedIndex != 1) {
+          setState(() {
+            _selectedIndex = 1;
+          });
+        }
+      });
+    }
+    _wasStreaming = isStreaming;
+
     return Consumer<DisplayProvider>(
       builder: (context, display, child) {
         final double dimOpacity = (1.0 - display.brightness).clamp(0.0, 0.85);
