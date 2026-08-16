@@ -76,7 +76,8 @@ class WirelessAABridge {
     // Surface the engine's socket-accept as the streaming step, for both
     // wizard-initiated and phone-initiated sessions.
     _engineStateSub ??= AndroidAutoEngine().stateStream.listen((state) {
-      if (state == AAEngineState.streamingActive && _isRunning) {
+      if (state == AAEngineState.streamingActive) {
+        _isRunning = true;
         _emit(AAConnectionStep.streaming, 'Android Auto streaming',
             data: {'deviceName': 'Android Phone'});
       }
@@ -238,7 +239,7 @@ class WirelessAABridge {
       });
       _emit(AAConnectionStep.tlsHandshake,
           'Phone connected — exchanging Wi-Fi credentials…');
-    } else if (event.startsWith('CREDENTIALS_SENT')) {
+    } else if (event.startsWith('CREDENTIALS_SENT') || event.startsWith('HANDOFF_COMPLETE_RFCOMM_CLOSED')) {
       _emit(AAConnectionStep.channelDiscovery,
           'Phone joining hotspot & opening projection stream…');
     } else if (event.startsWith('PHONE_DISCONNECTED')) {
@@ -249,7 +250,14 @@ class WirelessAABridge {
             'Bluetooth dropped — reconnect your phone to "$_bluetoothAlias"');
       }
     } else if (event.startsWith('ERROR')) {
-      _emit(AAConnectionStep.error, event.substring('ERROR'.length).trim());
+      final errorMsg = event.substring('ERROR'.length).trim();
+      // Ignore normal post-handoff RFCOMM reset errors
+      if (errorMsg.contains('104') || errorMsg.toLowerCase().contains('reset')) {
+        _emit(AAConnectionStep.channelDiscovery,
+            'Wi-Fi handoff complete — connecting projection…');
+      } else {
+        _emit(AAConnectionStep.error, errorMsg);
+      }
     }
   }
 
@@ -273,6 +281,8 @@ class WirelessAABridge {
         throw Exception('nmcli create failed: ${result.stderr}');
       }
     }
+
+    await Process.run('sudo', ['nmcli', 'connection', 'modify', _hotspotConnectionName, 'autoconnect', 'no']);
 
     final up = await Process.run('sudo', ['nmcli', 'connection', 'up', _hotspotConnectionName]);
     if (up.exitCode != 0) {

@@ -266,6 +266,7 @@ def detect_hotspot_ip(explicit):
 
 
 def handle_connection(fd, config, device_path):
+    credentials_sent = False
     try:
         reader = RawReader(fd)
 
@@ -299,13 +300,17 @@ def handle_connection(fd, config, device_path):
         while True:
             msg_id, payload = read_frame(reader)
             if msg_id is None:
-                emit("PHONE_DISCONNECTED")
+                if credentials_sent:
+                    emit("HANDOFF_COMPLETE_RFCOMM_CLOSED")
+                else:
+                    emit("PHONE_DISCONNECTED")
                 return
 
             if msg_id == MSG_WIFI_INFO_REQUEST:
                 bssid = detect_bssid(config.bssid)
                 write_frame(fd, MSG_WIFI_INFO_RESPONSE,
                             encode_wifi_info_response(config.ssid, config.psk, bssid))
+                credentials_sent = True
                 emit(f"CREDENTIALS_SENT ssid={config.ssid} bssid={bssid}")
             elif msg_id == MSG_WIFI_START_RESPONSE:
                 emit("WIFI_START_RESPONSE")
@@ -319,7 +324,10 @@ def handle_connection(fd, config, device_path):
             else:
                 emit(f"UNKNOWN_MESSAGE id={msg_id} len={len(payload)}")
     except OSError as exc:
-        emit(f"ERROR rfcomm i/o failed: {exc}")
+        if credentials_sent or "104" in str(exc) or "reset" in str(exc).lower():
+            emit("HANDOFF_COMPLETE_RFCOMM_CLOSED")
+        else:
+            emit(f"ERROR rfcomm i/o failed: {exc}")
     finally:
         with _lock:
             _active_devices.discard(device_path)

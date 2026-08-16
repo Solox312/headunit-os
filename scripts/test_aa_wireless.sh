@@ -80,6 +80,16 @@ HOTSPOT_NAME="HeadUnit-OS"
 HOTSPOT_SSID="HeadUnit-OS"
 HOTSPOT_PASS="headunit2024"
 
+# Clean up any client-mode profiles that might try to auto-connect to the AP
+for con in $(nmcli -t -f UUID,TYPE connection show | grep ':802-11-wireless' | cut -d: -f1); do
+  MODE=$(nmcli -t -f 802-11-wireless.mode connection show "$con" 2>/dev/null | cut -d: -f2)
+  SSID=$(nmcli -t -f 802-11-wireless.ssid connection show "$con" 2>/dev/null | cut -d: -f2)
+  if [ "$SSID" = "$HOTSPOT_SSID" ] && [ "$MODE" != "ap" ]; then
+    echo -e "  ${YELLOW}Removing conflicting client profile for '$SSID'...${NC}"
+    sudo nmcli connection delete "$con" >/dev/null 2>&1 || true
+  fi
+done
+
 if ! nmcli connection show "$HOTSPOT_NAME" >/dev/null 2>&1; then
   echo -e "  Creating Wi-Fi AP profile '$HOTSPOT_NAME'..."
   sudo nmcli connection add \
@@ -94,6 +104,9 @@ if ! nmcli connection show "$HOTSPOT_NAME" >/dev/null 2>&1; then
     wifi-sec.psk "$HOTSPOT_PASS" \
     autoconnect no
 fi
+
+# Ensure autoconnect is disabled so NetworkManager never connects to it as a client
+sudo nmcli connection modify "$HOTSPOT_NAME" autoconnect no 2>/dev/null || true
 
 echo -e "  Starting hotspot..."
 sudo nmcli connection up "$HOTSPOT_NAME" || {
