@@ -696,7 +696,7 @@ EnableTouchscreen=true
 [Bluetooth]
 AdapterType=0
 [Audio]
-OutputBackendType=1
+OutputBackendType=2
 MusicAudioChannelEnabled=true
 SpeechAudioChannelEnabled=true
 [Wireless]
