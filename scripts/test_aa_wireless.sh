@@ -50,6 +50,11 @@ sleep 1
 sudo rfkill unblock bluetooth 2>/dev/null || true
 sudo systemctl start bluetooth
 
+# Ensure PulseAudio with Bluetooth module is active so phone connects A2DP/HFP
+pulseaudio --start --log-target=syslog 2>/dev/null || true
+pactl load-module module-bluetooth-policy 2>/dev/null || true
+pactl load-module module-bluetooth-discover 2>/dev/null || true
+
 BT_CONTROLLER=$(bluetoothctl list | head -n 1 | awk '{print $2}')
 if [ -z "$BT_CONTROLLER" ]; then
   echo -e "  [${RED}FAIL${NC}] No Bluetooth controller found! Connect a Bluetooth adapter or check rfkill."
