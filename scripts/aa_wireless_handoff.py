@@ -498,6 +498,7 @@ def main():
             AAWirelessProfile(_bus, path, config)
             profile_opts = {
                 "Name": "Android Auto Wireless" if uuid == AA_WIRELESS_UUID else "Serial Port",
+                "Role": "server",
                 "RequireAuthentication": dbus.Boolean(False),
                 "RequireAuthorization": dbus.Boolean(False),
                 "Channel": dbus.UInt16(channel_num),
