@@ -357,9 +357,16 @@ def _advertised_candidates(device_path):
 
 
 def _connect_loop(device_path):
+    """Wait for the phone to call NewConnection on our registered AA profile.
+
+    We no longer call ConnectProfile here: attempting it while the phone is
+    simultaneously connecting to us (phone-initiated) causes a D-Bus deadlock
+    and python-dbus heap corruption.  BlueZ will call NewConnection
+    automatically when the phone opens our RFCOMM channel 22.
+    """
     try:
-        # Wait up to 5 seconds for ServicesResolved so BlueZ has fetched phone's SDP records
-        for _ in range(10):
+        # Wait up to 6 seconds for ServicesResolved so BlueZ has phone's SDP
+        for _ in range(12):
             try:
                 props = dbus.Interface(_bus.get_object("org.bluez", device_path),
                                        "org.freedesktop.DBus.Properties")
@@ -371,30 +378,7 @@ def _connect_loop(device_path):
 
         candidates = _advertised_candidates(device_path)
         emit(f"PHONE_SEEN {device_path} candidates={','.join(candidates)}")
-
-        for attempt in range(1, 4):
-            for uuid in candidates:
-                with _lock:
-                    if device_path in _active_devices:
-                        return
-                try:
-                    device = dbus.Interface(_bus.get_object("org.bluez", device_path),
-                                            "org.bluez.Device1")
-                    device.ConnectProfile(uuid, timeout=8)
-                    emit(f"CONNECT_PROFILE_OK {device_path} uuid={uuid}")
-                    return  # BlueZ delivers the fd via Profile1.NewConnection
-                except dbus.exceptions.DBusException as exc:
-                    name = exc.get_dbus_name() or ""
-                    if "AlreadyConnected" in name or "InProgress" in name:
-                        emit(f"CONNECT_PROFILE_ALREADY {device_path} uuid={uuid}")
-                        return
-                    # Log ALL failures so we can see exact error
-                    emit(f"CONNECT_ATTEMPT_FAILED attempt={attempt} uuid={uuid} error={name}: {exc}")
-                    if "NotAvailable" in name or "not-supported" in str(exc).lower():
-                        # Phone not hosting — will connect into our server channel
-                        break
-            time.sleep(2.0)
-        emit(f"AWAITING_PHONE_INBOUND {device_path} (BlueZ profile listening on Channel {RFCOMM_CHANNEL})")
+        emit(f"AWAITING_PHONE_INBOUND {device_path} (BlueZ profile on Channel {RFCOMM_CHANNEL})")
     finally:
         with _lock:
             _attempting_devices.discard(device_path)
@@ -484,9 +468,10 @@ def main():
                              "org.bluez.ProfileManager1")
 
     registered_paths = []
+    # Only the AA Wireless UUID on Channel 22.
+    # Registering SPP on channel 1 causes wrong-channel connections that crash.
     profile_map = {
         AA_WIRELESS_UUID: RFCOMM_CHANNEL,
-        SPP_UUID: 1,
     }
     for index, (uuid, channel_num) in enumerate(profile_map.items()):
         path = f"{PROFILE_PATH}{index}"
