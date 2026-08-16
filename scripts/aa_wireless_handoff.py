@@ -501,10 +501,11 @@ def main():
             _profile_objects.append(profile_obj)
             profile_opts = {
                 "Name": "Android Auto Wireless",
+                "Role": "server",
                 "RequireAuthentication": dbus.Boolean(False),
                 "RequireAuthorization": dbus.Boolean(False),
                 "Channel": dbus.UInt16(channel_num),
-                "AutoConnect": dbus.Boolean(False),  # phone initiates; we don't dial out
+                "AutoConnect": dbus.Boolean(False),
             }
             manager.RegisterProfile(path, uuid, profile_opts)
             registered_paths.append(path)
