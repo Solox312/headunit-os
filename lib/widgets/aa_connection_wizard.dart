@@ -124,6 +124,21 @@ class _AAConnectionWizardState extends State<AAConnectionWizard>
                 ],
               ),
               const Spacer(),
+              ElevatedButton.icon(
+                onPressed: () {
+                  widget.onStreaming?.call('Android Phone', 100);
+                },
+                icon: const Icon(Icons.play_arrow_rounded, size: 16),
+                label: Text('Open Screen', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AutomotiveColors.androidAutoColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+              ),
+              const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: _cancel,
                 icon: const Icon(Icons.close_rounded, size: 14),

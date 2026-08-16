@@ -40,7 +40,15 @@ class AAConnectionEvent {
 class WirelessAABridge {
   static final WirelessAABridge _instance = WirelessAABridge._internal();
   factory WirelessAABridge() => _instance;
-  WirelessAABridge._internal();
+  WirelessAABridge._internal() {
+    _engineStateSub = AndroidAutoEngine().stateStream.listen((state) {
+      if (state == AAEngineState.streamingActive) {
+        _isRunning = true;
+        _emit(AAConnectionStep.streaming, 'Android Auto streaming',
+            data: {'deviceName': 'Android Phone'});
+      }
+    });
+  }
 
   Process? _handoffProcess;
   StreamSubscription<AAEngineState>? _engineStateSub;
@@ -72,17 +80,6 @@ class WirelessAABridge {
   /// headphones and never initiate the Android Auto handshake.
   Future<void> ensureHandoffDaemon() async {
     if (Platform.isWindows || _handoffProcess != null) return;
-
-    // Surface the engine's socket-accept as the streaming step, for both
-    // wizard-initiated and phone-initiated sessions.
-    _engineStateSub ??= AndroidAutoEngine().stateStream.listen((state) {
-      if (state == AAEngineState.streamingActive) {
-        _isRunning = true;
-        _emit(AAConnectionStep.streaming, 'Android Auto streaming',
-            data: {'deviceName': 'Android Phone'});
-      }
-    });
-
     await _launchBtHandoffDaemon();
   }
 
@@ -337,6 +334,8 @@ class WirelessAABridge {
   }
 
   void dispose() {
+    _engineStateSub?.cancel();
+    _engineStateSub = null;
     _eventController.close();
   }
 }
