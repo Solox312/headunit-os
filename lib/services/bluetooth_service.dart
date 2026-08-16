@@ -332,7 +332,7 @@ class BluetoothService {
     }
   }
 
-  /// Pair and connect to a Bluetooth device by MAC address.
+  /// Pair and connect to a Bluetooth device (audio speaker / phone) by MAC address.
   Future<bool> pairAndConnect(String macAddress) async {
     if (!await isBluetoothctlAvailable()) {
       if (kDebugMode) print('[BluetoothService] Simulator: Mocking pair & connect to $macAddress');
@@ -341,14 +341,50 @@ class BluetoothService {
     }
 
     try {
-      await Process.run('bluetoothctl', ['agent', 'NoInputNoOutput']);
-      await Process.run('bluetoothctl', ['default-agent']);
+      // Ensure bluetooth radio is unblocked and powered on
+      await Process.run('rfkill', ['unblock', 'bluetooth']);
       await Process.run('bluetoothctl', ['power', 'on']);
 
-      await Process.run('bluetoothctl', ['pair', macAddress]);
+      // Step 1: Trust device first so BlueZ allows incoming and outgoing handshakes without rejection
       await Process.run('bluetoothctl', ['trust', macAddress]);
-      final connResult = await Process.run('bluetoothctl', ['connect', macAddress]);
-      return connResult.exitCode == 0;
+
+      // Step 2: Attempt pairing (ignore if already paired / bond already exists)
+      final pairResult = await Process.run('bluetoothctl', ['pair', macAddress]);
+      if (kDebugMode) {
+        print('[BluetoothService] pair ($macAddress) exitCode: ${pairResult.exitCode}, out: ${pairResult.stdout.toString().trim()}');
+      }
+
+      // Step 3: Brief delay for Service Discovery Protocol (SDP) and A2DP sink endpoint creation
+      await Future.delayed(const Duration(milliseconds: 1000));
+
+      // Step 4: Ensure trusted
+      await Process.run('bluetoothctl', ['trust', macAddress]);
+
+      // Step 5: Connect with retry loop (up to 3 attempts for slow-connecting Bluetooth speakers)
+      for (int attempt = 1; attempt <= 3; attempt++) {
+        if (kDebugMode) print('[BluetoothService] Connection attempt $attempt to $macAddress...');
+        final connResult = await Process.run('bluetoothctl', ['connect', macAddress]);
+        final connOutput = connResult.stdout.toString().toLowerCase();
+
+        if (kDebugMode) {
+          print('[BluetoothService] connect attempt $attempt out: $connOutput');
+        }
+
+        await Future.delayed(const Duration(milliseconds: 1200));
+
+        // Check if device is reported as connected
+        if (await _isDeviceConnected(macAddress)) {
+          if (kDebugMode) print('[BluetoothService] Connected to $macAddress successfully!');
+          return true;
+        }
+
+        if (connResult.exitCode == 0 && (connOutput.contains('successful') || connOutput.contains('connected: yes'))) {
+          return true;
+        }
+      }
+
+      // Final check in case connection established async
+      return await _isDeviceConnected(macAddress);
     } catch (e) {
       if (kDebugMode) print('[BluetoothService] pairAndConnect exception: $e');
       return false;

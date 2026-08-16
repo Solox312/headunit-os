@@ -269,7 +269,13 @@ class BluetoothScreen extends StatelessWidget {
                                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                           ),
                                           onPressed: bt.isConnecting ? null : () => bt.pairAndConnect(dev.macAddress),
-                                          child: Text("Connect", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                                          child: bt.isConnecting && bt.connectingMacAddress == dev.macAddress
+                                              ? const SizedBox(
+                                                  width: 14,
+                                                  height: 14,
+                                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                                                )
+                                              : Text("Connect", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
                                         ),
                                       IconButton(
                                         icon: const Icon(Icons.delete_outline_rounded, color: AutomotiveColors.textMuted, size: 20),
@@ -368,7 +374,13 @@ class BluetoothScreen extends StatelessWidget {
                                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                         ),
                                         onPressed: bt.isConnecting ? null : () => bt.pairAndConnect(dev.macAddress),
-                                        child: Text("Pair & Connect", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                                        child: bt.isConnecting && bt.connectingMacAddress == dev.macAddress
+                                            ? const SizedBox(
+                                                width: 14,
+                                                height: 14,
+                                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                                              )
+                                            : Text("Pair & Connect", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.close_rounded, color: AutomotiveColors.textMuted, size: 18),

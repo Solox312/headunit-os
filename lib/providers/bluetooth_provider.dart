@@ -19,10 +19,13 @@ class BluetoothProvider extends ChangeNotifier {
   List<BluetoothDevice> _pairedDevices = [];
   List<BluetoothDevice> _discoveredDevices = [];
 
+  String? _connectingMacAddress;
+
   bool get isBluetoothEnabled => _isBluetoothEnabled;
   bool get isDiscoverable => _isDiscoverable;
   bool get isScanning => _isScanning;
   bool get isConnecting => _isConnecting;
+  String? get connectingMacAddress => _connectingMacAddress;
   String? get errorMessage => _errorMessage;
 
   List<BluetoothDevice> get pairedDevices => List.unmodifiable(_pairedDevices);
@@ -203,6 +206,7 @@ class BluetoothProvider extends ChangeNotifier {
 
   Future<bool> pairAndConnect(String macAddress) async {
     _isConnecting = true;
+    _connectingMacAddress = macAddress;
     _errorMessage = null;
     notifyListeners();
 
@@ -213,14 +217,15 @@ class BluetoothProvider extends ChangeNotifier {
         _discoveredDevices.removeWhere((dev) => dev.macAddress.toUpperCase() == macAddress.toUpperCase());
         return true;
       } else {
-        _errorMessage = 'Failed to pair with device ($macAddress). Ensure device is in pairing mode.';
+        _errorMessage = 'Could not connect to $macAddress. Ensure the speaker is in pairing mode and disconnected from other devices.';
         return false;
       }
     } catch (e) {
-      _errorMessage = 'Error pairing device: $e';
+      _errorMessage = 'Error connecting to device: $e';
       return false;
     } finally {
       _isConnecting = false;
+      _connectingMacAddress = null;
       notifyListeners();
     }
   }

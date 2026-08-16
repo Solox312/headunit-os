@@ -1025,7 +1025,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       foregroundColor: Colors.black,
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     ),
-                                    onPressed: () async {
+                                    onPressed: bt.isConnecting ? null : () async {
                                       final nav = Navigator.of(context);
                                       final ok = await bt.pairAndConnect(dev.macAddress);
                                       if (ok && mounted) {
@@ -1036,7 +1036,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         nav.pop();
                                       }
                                     },
-                                    child: Text("Pair & Connect", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                                    child: bt.isConnecting && bt.connectingMacAddress == dev.macAddress
+                                        ? const SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                                          )
+                                        : Text("Pair & Connect", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.close_rounded, color: AutomotiveColors.textMuted, size: 18),
