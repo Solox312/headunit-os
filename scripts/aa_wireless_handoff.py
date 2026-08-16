@@ -483,15 +483,11 @@ def main():
                              "org.bluez.ProfileManager1")
 
     registered_paths = []
-    # Register all three AA-related UUIDs on channel 22.
-    # The phone uses the AA UUID (4de17a00) for SDP discovery but may open the
-    # RFCOMM connection via SPP UUID (00001101) or the Google AA UUID (a3c87600).
-    # Registering all three on the same channel ensures NewConnection fires
-    # regardless of which UUID the phone uses to open the socket.
+    # Assign distinct RFCOMM channels per UUID to prevent BlueZ channel collisions:
     profile_map = {
-        AA_WIRELESS_UUID: RFCOMM_CHANNEL,   # primary: AA UUID
-        SPP_UUID:         RFCOMM_CHANNEL,   # fallback: phone may use SPP UUID
-        GOOGLE_AA_UUID:   RFCOMM_CHANNEL,   # fallback: Google AA UUID
+        AA_WIRELESS_UUID: 22,  # Primary Android Auto UUID
+        SPP_UUID:         1,   # Serial Port Profile (fallback)
+        GOOGLE_AA_UUID:   23,  # Google Android Auto secondary UUID
     }
     for index, (uuid, channel_num) in enumerate(profile_map.items()):
         path = f"{PROFILE_PATH}{index}"
