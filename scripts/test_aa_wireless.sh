@@ -65,12 +65,22 @@ else
   sleep 1
 fi
 
+# Ensure BlueZ is running with --compat for SDP service advertisement
+if ! ps aux | grep -v grep | grep -q "bluetoothd.*--compat"; then
+  echo -e "  ${YELLOW}Enabling BlueZ SDP compatibility mode (--compat)...${NC}"
+  sudo sed -i 's|^ExecStart=.*bluetoothd.*|ExecStart=/usr/lib/bluetooth/bluetoothd --compat|' /lib/systemd/system/bluetooth.service 2>/dev/null || true
+  sudo systemctl daemon-reload
+  sudo systemctl restart bluetooth
+  sleep 1
+fi
+
 # Set BT Alias and Discoverability
 bluetoothctl system-alias "HeadUnit-OS" >/dev/null 2>&1 || true
 bluetoothctl power on >/dev/null 2>&1 || true
 bluetoothctl discoverable on >/dev/null 2>&1 || true
 bluetoothctl pairable on >/dev/null 2>&1 || true
-echo -e "  [${GREEN}OK${NC}] Bluetooth discoverable as: ${CYAN}HeadUnit-OS${NC}"
+sudo sdptool add --channel=22 SP >/dev/null 2>&1 || true
+echo -e "  [${GREEN}OK${NC}] Bluetooth discoverable as: ${CYAN}HeadUnit-OS${NC} (SDP Channel 22 active)"
 
 # ── 3. Wi-Fi Hotspot Verification ─────────────────────────────────────────────
 echo ""

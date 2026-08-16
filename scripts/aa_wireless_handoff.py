@@ -372,7 +372,7 @@ def _connect_loop(device_path):
         candidates = _advertised_candidates(device_path)
         emit(f"PHONE_SEEN {device_path} candidates={','.join(candidates)}")
 
-        for attempt in range(1, CONNECT_ATTEMPTS + 1):
+        for attempt in range(1, 3):
             for uuid in candidates:
                 with _lock:
                     if device_path in _active_devices:
@@ -380,16 +380,19 @@ def _connect_loop(device_path):
                 try:
                     device = dbus.Interface(_bus.get_object("org.bluez", device_path),
                                             "org.bluez.Device1")
-                    device.ConnectProfile(uuid, timeout=30)
+                    device.ConnectProfile(uuid, timeout=5)
                     emit(f"CONNECT_PROFILE_OK {device_path} uuid={uuid}")
                     return  # BlueZ delivers the fd via Profile1.NewConnection
                 except dbus.exceptions.DBusException as exc:
                     name = exc.get_dbus_name() or ""
                     if "AlreadyConnected" in name or "InProgress" in name:
                         return
-                    emit(f"CONNECT_ATTEMPT_FAILED attempt={attempt} uuid={uuid} device={device_path} error={name}: {exc}")
-            time.sleep(CONNECT_RETRY_DELAY_S)
-        emit(f"CONNECT_GAVE_UP {device_path} (awaiting phone inbound connection)")
+                    if "NotAvailable" in name or "not-supported" in str(exc).lower():
+                        # Phone does not host server profile — it will connect into our server channel
+                        break
+                    emit(f"CONNECT_ATTEMPT_FAILED attempt={attempt} uuid={uuid} error={name}: {exc}")
+            time.sleep(1.0)
+        emit(f"AWAITING_PHONE_INBOUND {device_path} (listening on Channel 22)")
     finally:
         with _lock:
             _attempting_devices.discard(device_path)
