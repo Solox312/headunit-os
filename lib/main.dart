@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'app.dart';
+import 'services/audio_routing_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +16,8 @@ void main() {
   if (returnFromAA) {
     try { flagFile.deleteSync(); } catch (_) {}
   }
+
+  AudioRoutingService().init();
 
   runApp(RpiHeadunitApp(skipSplash: returnFromAA, initialIndex: returnFromAA ? 1 : 0));
 }

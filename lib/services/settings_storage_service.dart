@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'audio_routing_service.dart';
 
 class SettingsStorageService {
   static final SettingsStorageService _instance = SettingsStorageService._internal();
@@ -155,6 +156,7 @@ class SettingsStorageService {
   /// Helper to save audio output target selection.
   Future<void> saveAudioOutputTarget(String target) async {
     await saveSettings({'audioOutputTarget': target});
+    await AudioRoutingService().applyAudioRouting(target);
   }
 
   /// Helper to read stored audio output target selection (defaults to 'AUX Cable / 3.5mm DAC').

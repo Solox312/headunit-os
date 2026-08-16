@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/bluetooth_device.dart';
+import 'audio_routing_service.dart';
 
 /// System service for scanning, pairing, connecting, and managing Bluetooth devices
 /// on both Linux Mint (testing host) and Raspberry Pi OS via Linux BlueZ `bluetoothctl` & `rfkill`.
@@ -338,8 +339,8 @@ class BluetoothService {
     }
   }
 
-  /// Routes Linux PulseAudio / PipeWire audio output to the newly connected Bluetooth speaker
-  /// and locks the A2DP profile to prevent the 2-second timeout disconnect loop.
+  /// Routes Linux PulseAudio / PipeWire audio output according to user selection
+  /// and locks the A2DP profile so BlueZ does not drop the link.
   Future<void> _routeAudioToBluetoothSpeaker(String macAddress) async {
     if (!Platform.isLinux) return;
     try {
@@ -352,38 +353,49 @@ class BluetoothService {
       await Process.run('pactl', ['set-card-profile', 'bluez_card.$macUnderscore', 'a2dp_source']);
       await Process.run('pactl', ['set-card-profile', 'bluez_card.$macLower', 'a2dp_source']);
 
-      // PulseAudio default sink route
-      final sinksResult = await Process.run('pactl', ['list', 'sinks', 'short']);
-      if (sinksResult.exitCode == 0) {
-        final sinkLines = sinksResult.stdout.toString().split('\n');
-        for (final line in sinkLines) {
-          if (line.contains(macUnderscore) || line.contains(macLower) || line.contains('bluez')) {
-            final parts = line.trim().split(RegExp(r'\s+'));
-            if (parts.length >= 2) {
-              final sinkName = parts[1];
-              await Process.run('pactl', ['set-default-sink', sinkName]);
-              if (kDebugMode) print('[BluetoothService] Set PulseAudio default sink: $sinkName');
-              break;
-            }
-          }
-        }
-      }
+      // Check user's configured audio routing target before switching default output
+      final activeTarget = AudioRoutingService().currentTarget;
 
-      // PipeWire / WirePlumber default sink route
-      final wpResult = await Process.run('wpctl', ['status']);
-      if (wpResult.exitCode == 0) {
-        final wpLines = wpResult.stdout.toString().split('\n');
-        for (final line in wpLines) {
-          if ((line.contains(macUnderscore) || line.contains(macAddress) || line.contains('bluez')) && line.contains('.')) {
-            final match = RegExp(r'(\d+)\.').firstMatch(line);
-            if (match != null) {
-              final id = match.group(1)!;
-              await Process.run('wpctl', ['set-default', id]);
-              if (kDebugMode) print('[BluetoothService] Set WirePlumber default sink ID: $id');
-              break;
+      if (activeTarget.contains('Bluetooth')) {
+        // User explicitly wants Bluetooth audio output -> set default sink
+        final sinksResult = await Process.run('pactl', ['list', 'sinks', 'short']);
+        if (sinksResult.exitCode == 0) {
+          final sinkLines = sinksResult.stdout.toString().split('\n');
+          for (final line in sinkLines) {
+            if (line.contains(macUnderscore) || line.contains(macLower) || line.contains('bluez')) {
+              final parts = line.trim().split(RegExp(r'\s+'));
+              if (parts.length >= 2) {
+                final sinkName = parts[1];
+                await Process.run('pactl', ['set-default-sink', sinkName]);
+                if (kDebugMode) print('[BluetoothService] Set PulseAudio default sink: $sinkName');
+                break;
+              }
             }
           }
         }
+
+        // PipeWire / WirePlumber default sink route
+        final wpResult = await Process.run('wpctl', ['status']);
+        if (wpResult.exitCode == 0) {
+          final wpLines = wpResult.stdout.toString().split('\n');
+          for (final line in wpLines) {
+            if ((line.contains(macUnderscore) || line.contains(macAddress) || line.contains('bluez')) && line.contains('.')) {
+              final match = RegExp(r'(\d+)\.').firstMatch(line);
+              if (match != null) {
+                final id = match.group(1)!;
+                await Process.run('wpctl', ['set-default', id]);
+                if (kDebugMode) print('[BluetoothService] Set WirePlumber default sink ID: $id');
+                break;
+              }
+            }
+          }
+        }
+      } else {
+        // User selected AUX, HDMI, or FM Transmitter -> Re-assert user's non-Bluetooth target!
+        if (kDebugMode) {
+          print('[BluetoothService] Bluetooth connected, but keeping user-selected sound route "$activeTarget"');
+        }
+        await AudioRoutingService().applyAudioRouting(activeTarget);
       }
     } catch (e) {
       if (kDebugMode) print('[BluetoothService] Audio routing error: $e');
