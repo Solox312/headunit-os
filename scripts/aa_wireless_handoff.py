@@ -494,7 +494,7 @@ def main():
                 "RequireAuthentication": dbus.Boolean(False),
                 "RequireAuthorization": dbus.Boolean(False),
                 "Channel": dbus.UInt16(channel_num),
-                "AutoConnect": dbus.Boolean(True),
+                "AutoConnect": dbus.Boolean(False),  # phone initiates; we don't dial out
             }
             manager.RegisterProfile(path, uuid, profile_opts)
             registered_paths.append(path)
