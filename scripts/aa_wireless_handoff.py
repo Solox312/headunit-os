@@ -55,21 +55,20 @@ def emit(event):
     print(f"EVENT:{event}", flush=True)
 
 try:
-    import dbus
-    import dbus.service
-    import dbus.mainloop.glib
-    from gi.repository import GLib
+    import dbus  # type: ignore
+    import dbus.service  # type: ignore
+    import dbus.mainloop.glib  # type: ignore
+    from gi.repository import GLib  # type: ignore
 except ImportError as exc:
     emit(f"ERROR missing python dependency ({exc}) — run: sudo apt install python3-dbus python3-gi")
     sys.exit(1)
 
-# Confirmed via aa-proxy-rs source — this is the only real AA Wireless RFCOMM
-# UUID. (An earlier revision of this daemon also tried a Google
-# vendor-specific UUID this phone advertises, a3c87600-0005-1000-8000-
-# 001a11000100 — btmon proved that's an ATT/GATT characteristic (L2CAP PSM
-# 31), not an RFCOMM byte-stream service, so it's been dropped entirely.)
+# Confirmed via aa-proxy-rs & openauto source
 AA_WIRELESS_UUID = "4de17a00-52cb-11e6-bdf4-0800200c9a66"
-AA_UUID_CANDIDATES = [AA_WIRELESS_UUID]
+SPP_UUID = "00001101-0000-1000-8000-00805f9b34fb"
+GOOGLE_AA_UUID = "a3c87600-0005-1000-8000-001a11000100"
+
+AA_UUID_CANDIDATES = [AA_WIRELESS_UUID, SPP_UUID, GOOGLE_AA_UUID]
 PROFILE_PATH = "/org/headunitos/aa_wireless"
 
 # Message ids on the RFCOMM handoff link (aa-proxy-rs ProxyMessageId enum)
@@ -353,8 +352,25 @@ def _advertised_candidates(device_path):
 
 def _connect_loop(device_path):
     try:
+        # Wait up to 5 seconds for ServicesResolved so BlueZ has fetched phone's SDP records
+        for _ in range(10):
+            try:
+                props = dbus.Interface(_bus.get_object("org.bluez", device_path),
+                                       "org.freedesktop.DBus.Properties")
+                if bool(props.Get("org.bluez.Device1", "ServicesResolved")):
+                    break
+            except Exception:
+                pass
+            time.sleep(0.5)
+
         candidates = _advertised_candidates(device_path)
         emit(f"PHONE_SEEN {device_path} candidates={','.join(candidates)}")
+
+        # Check if phone advertises any of our target UUIDs for outbound connection
+        has_advertised_match = any(c in AA_UUID_CANDIDATES for c in candidates)
+        if not has_advertised_match:
+            emit(f"WAITING_FOR_PHONE_INBOUND {device_path} (Head Unit RFCOMM Server listening on Channel 22)")
+
         for attempt in range(1, CONNECT_ATTEMPTS + 1):
             for uuid in candidates:
                 with _lock:
@@ -372,25 +388,27 @@ def _connect_loop(device_path):
                         return
                     emit(f"CONNECT_ATTEMPT_FAILED attempt={attempt} uuid={uuid} device={device_path} error={name}: {exc}")
             time.sleep(CONNECT_RETRY_DELAY_S)
-        emit(f"CONNECT_GAVE_UP {device_path}")
+        emit(f"CONNECT_GAVE_UP {device_path} (awaiting phone inbound connection)")
     finally:
         with _lock:
             _attempting_devices.discard(device_path)
 
 
 def on_properties_changed(interface, changed, invalidated, path=None):
-    # Diagnostic instrumentation: every previously-successful connect in this
-    # daemon came from connect_already_connected_devices() at startup — this
-    # live signal path has never been proven to actually fire. Log receipt
-    # unconditionally and guard the body, since dbus-python signal callbacks
-    # that raise are silently swallowed by the GLib mainloop (no traceback,
-    # no crash — just nothing happens), which would look identical to the
-    # signal simply never arriving.
     try:
         emit(f"PROPS_CHANGED_RX interface={interface} path={path} keys={list(changed.keys())}")
         if interface != "org.bluez.Device1" or path is None:
             return
-        if bool(changed.get("Connected", False)):
+        
+        if "ServicesResolved" in changed and bool(changed["ServicesResolved"]):
+            try:
+                props = dbus.Interface(_bus.get_object("org.bluez", path), "org.freedesktop.DBus.Properties")
+                uuids = [str(u).lower() for u in props.Get("org.bluez.Device1", "UUIDs")]
+                emit(f"PHONE_SERVICES_RESOLVED {path} uuids={','.join(uuids)}")
+            except Exception as e:
+                emit(f"PHONE_SERVICES_RESOLVED {path} (could not read uuids: {e})")
+            start_connect_loop(str(path))
+        elif bool(changed.get("Connected", False)):
             emit(f"DEVICE_CONNECTED_SIGNAL {path}")
             start_connect_loop(str(path))
     except Exception as exc:
@@ -453,22 +471,30 @@ def main():
     manager = dbus.Interface(_bus.get_object("org.bluez", "/org/bluez"),
                              "org.bluez.ProfileManager1")
 
-    # One profile object per candidate UUID — BlueZ routes the resulting fd
-    # to whichever profile matches the UUID that connected. No Role
-    # restriction: we mainly connect outward (ConnectProfile), but stay open
-    # to phone-initiated connections too.
+    # One profile object per candidate UUID with assigned RFCOMM Server Channels
+    # so the phone's SDP discovery sees our open RFCOMM listener.
     registered_paths = []
+    channels = {
+        AA_WIRELESS_UUID: 22,
+        SPP_UUID: 1,
+        GOOGLE_AA_UUID: 23,
+    }
+
     for index, uuid in enumerate(AA_UUID_CANDIDATES):
         path = f"{PROFILE_PATH}{index}"
+        channel_num = channels.get(uuid, 22 + index)
         try:
             AAWirelessProfile(_bus, path, config)
-            manager.RegisterProfile(path, uuid, {
-                "Name": "Android Auto Wireless",
+            profile_opts = {
+                "Name": "Android Auto Wireless" if uuid == AA_WIRELESS_UUID else "Serial Port",
                 "RequireAuthentication": dbus.Boolean(False),
                 "RequireAuthorization": dbus.Boolean(False),
-            })
+                "Channel": dbus.UInt16(channel_num),
+                "AutoConnect": dbus.Boolean(True),
+            }
+            manager.RegisterProfile(path, uuid, profile_opts)
             registered_paths.append(path)
-            emit(f"PROFILE_REGISTERED uuid={uuid}")
+            emit(f"PROFILE_REGISTERED uuid={uuid} channel={channel_num}")
         except dbus.exceptions.DBusException as exc:
             emit(f"PROFILE_REGISTER_FAILED uuid={uuid} error={exc}")
 
