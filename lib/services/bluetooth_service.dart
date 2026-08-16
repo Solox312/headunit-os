@@ -68,12 +68,18 @@ class BluetoothService {
         }
 
         final l = line.toLowerCase();
-        if (l.contains('confirm passkey') || l.contains('(yes/no)')) {
+        if (l.contains('confirm passkey') || l.contains('(yes/no)') || l.contains('request confirmation')) {
           _persistentAgentProcess!.stdin.writeln('yes');
-          if (kDebugMode) print('[BT-Agent] Auto-confirmed passkey.');
-        } else if (l.contains('authorize service') || l.contains('request authorization')) {
+          if (kDebugMode) print('[BT-Agent] Auto-confirmed passkey/pairing.');
+        } else if (l.contains('authorize service') || l.contains('request authorization') || l.contains('authorize path')) {
           _persistentAgentProcess!.stdin.writeln('yes');
-          if (kDebugMode) print('[BT-Agent] Auto-authorized service.');
+          if (kDebugMode) print('[BT-Agent] Auto-authorized service/path.');
+        } else if (l.contains('enter pin code') || l.contains('request pin code')) {
+          _persistentAgentProcess!.stdin.writeln('0000');
+          if (kDebugMode) print('[BT-Agent] Provided default PIN 0000.');
+        } else if (l.contains('enter passkey') || l.contains('request passkey')) {
+          _persistentAgentProcess!.stdin.writeln('000000');
+          if (kDebugMode) print('[BT-Agent] Provided default passkey 000000.');
         }
       });
 
@@ -332,6 +338,51 @@ class BluetoothService {
     }
   }
 
+  /// Routes Linux PulseAudio / PipeWire audio output to the newly connected Bluetooth speaker.
+  Future<void> _routeAudioToBluetoothSpeaker(String macAddress) async {
+    if (!Platform.isLinux) return;
+    try {
+      final macUnderscore = macAddress.replaceAll(':', '_').toUpperCase();
+      final macLower = macAddress.replaceAll(':', '_').toLowerCase();
+
+      // PulseAudio route
+      final sinksResult = await Process.run('pactl', ['list', 'sinks', 'short']);
+      if (sinksResult.exitCode == 0) {
+        final sinkLines = sinksResult.stdout.toString().split('\n');
+        for (final line in sinkLines) {
+          if (line.contains(macUnderscore) || line.contains(macLower) || line.contains('bluez')) {
+            final parts = line.trim().split(RegExp(r'\s+'));
+            if (parts.length >= 2) {
+              final sinkName = parts[1];
+              await Process.run('pactl', ['set-default-sink', sinkName]);
+              if (kDebugMode) print('[BluetoothService] Set PulseAudio default sink: $sinkName');
+              break;
+            }
+          }
+        }
+      }
+
+      // PipeWire / WirePlumber route
+      final wpResult = await Process.run('wpctl', ['status']);
+      if (wpResult.exitCode == 0) {
+        final wpLines = wpResult.stdout.toString().split('\n');
+        for (final line in wpLines) {
+          if ((line.contains(macUnderscore) || line.contains(macAddress) || line.contains('bluez')) && line.contains('.')) {
+            final match = RegExp(r'(\d+)\.').firstMatch(line);
+            if (match != null) {
+              final id = match.group(1)!;
+              await Process.run('wpctl', ['set-default', id]);
+              if (kDebugMode) print('[BluetoothService] Set WirePlumber default sink ID: $id');
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('[BluetoothService] Audio routing error: $e');
+    }
+  }
+
   /// Pair and connect to a Bluetooth device (audio speaker / phone) by MAC address.
   Future<bool> pairAndConnect(String macAddress) async {
     if (!await isBluetoothctlAvailable()) {
@@ -344,6 +395,10 @@ class BluetoothService {
       // Ensure bluetooth radio is unblocked and powered on
       await Process.run('rfkill', ['unblock', 'bluetooth']);
       await Process.run('bluetoothctl', ['power', 'on']);
+
+      // Forward trust & pair commands to persistent agent process
+      _persistentAgentProcess?.stdin.writeln('trust $macAddress');
+      _persistentAgentProcess?.stdin.writeln('pair $macAddress');
 
       // Step 1: Trust device first so BlueZ allows incoming and outgoing handshakes without rejection
       await Process.run('bluetoothctl', ['trust', macAddress]);
@@ -359,6 +414,8 @@ class BluetoothService {
 
       // Step 4: Ensure trusted
       await Process.run('bluetoothctl', ['trust', macAddress]);
+      _persistentAgentProcess?.stdin.writeln('trust $macAddress');
+      _persistentAgentProcess?.stdin.writeln('connect $macAddress');
 
       // Step 5: Connect with retry loop (up to 3 attempts for slow-connecting Bluetooth speakers)
       for (int attempt = 1; attempt <= 3; attempt++) {
@@ -375,16 +432,37 @@ class BluetoothService {
         // Check if device is reported as connected
         if (await _isDeviceConnected(macAddress)) {
           if (kDebugMode) print('[BluetoothService] Connected to $macAddress successfully!');
+          await _routeAudioToBluetoothSpeaker(macAddress);
           return true;
         }
 
         if (connResult.exitCode == 0 && (connOutput.contains('successful') || connOutput.contains('connected: yes'))) {
+          await _routeAudioToBluetoothSpeaker(macAddress);
+          return true;
+        }
+      }
+
+      // Fallback: If pairing state was corrupted/stale in BlueZ, remove bond and do a fresh 1-shot connect
+      if (!await _isDeviceConnected(macAddress)) {
+        if (kDebugMode) print('[BluetoothService] Retrying fresh handshake after clearing bond cache...');
+        await Process.run('bluetoothctl', ['remove', macAddress]);
+        await Future.delayed(const Duration(milliseconds: 500));
+        await Process.run('bluetoothctl', ['trust', macAddress]);
+        await Process.run('bluetoothctl', ['pair', macAddress]);
+        await Future.delayed(const Duration(milliseconds: 800));
+        final retryConn = await Process.run('bluetoothctl', ['connect', macAddress]);
+        if (retryConn.exitCode == 0 || await _isDeviceConnected(macAddress)) {
+          await _routeAudioToBluetoothSpeaker(macAddress);
           return true;
         }
       }
 
       // Final check in case connection established async
-      return await _isDeviceConnected(macAddress);
+      final isConnected = await _isDeviceConnected(macAddress);
+      if (isConnected) {
+        await _routeAudioToBluetoothSpeaker(macAddress);
+      }
+      return isConnected;
     } catch (e) {
       if (kDebugMode) print('[BluetoothService] pairAndConnect exception: $e');
       return false;

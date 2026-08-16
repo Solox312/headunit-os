@@ -44,3 +44,21 @@ is unchanged and still Raspberry-Pi-specific.
 - Hardware side of this revision: `docs/pcb_carrier_board_design.md` §2.1/§2.3, §3 (open items)
 - BOM: `docs/pcb_carrier_board_bom.xlsx`
 - Full handoff record: `docs/headunit_os_handoff.docx` §4.4, §5
+
+---
+
+## Radxa CM3S (Rockchip RK3566) Production Board Integration
+
+Tracked for the Radxa CM3S Compute Module production carrier boards:
+
+- [ ] **Hostapd 5 GHz Wi-Fi Lockdown (`/etc/hostapd/hostapd.conf`)**:
+      Configure the AP6256 / CYW43455 Wi-Fi driver strictly in 5.0 GHz mode (`hw_mode=a`, `channel=36`, `ieee80211ac=1`). Prevent 2.4 GHz co-channel congestion and packet collision between high-bandwidth Wireless Android Auto video/audio and concurrent Bluetooth A2DP speaker streaming.
+- [ ] **PipeWire / WirePlumber Audio Sink Auto-Routing**:
+      Verify WirePlumber policy on Rockchip Linux so that upon Bluetooth speaker connection, default audio sink automatically switches to `bluez_output.*.a2dp-sink` without interrupting Android Auto projection.
+- [ ] **KT0803K Device Tree & GPIO Power Enable**:
+      Confirm the carrier board GPIO mapped to the KT0803K transmitter enable/reset line (`PWR_EN` / `RST_N`). Ensure the Device Tree Overlay (`.dts`) configures this pin as active-high output on boot prior to I2C register configuration.
+- [ ] **Multi-Bus I2C Hardware Probe Verification**:
+      Bench-verify dynamic scanning across all RK3566 I2C buses (`/dev/i2c-2`, `/dev/i2c-3`, `/dev/i2c-4`) on production PCB hardware and validate address `0x3E` ACK.
+- [ ] **U.FL Dual-Band Antenna Routing**:
+      Ensure production harness connects external dual-band antennas to the CM3S U.FL connector for robust in-dash Wi-Fi Direct and Bluetooth 5.0 range.
+
