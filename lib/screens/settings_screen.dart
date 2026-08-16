@@ -551,51 +551,98 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: AutomotiveColors.textSecondary, letterSpacing: 0.5),
               ),
               const SizedBox(height: 8),
-              // Date format option list
-              ...TimeDateProvider.availableDateFormats.map((opt) {
-                final bool isSelected = timeDate.dateFormatPattern == opt.pattern;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AutomotiveColors.electricCyan.withAlpha(20) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.strokeSoft,
-                      width: 1.0,
-                    ),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                      dense: true,
-                      leading: Icon(
-                        Icons.calendar_today_rounded,
-                        size: 18,
-                        color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.textSecondary,
-                      ),
-                      title: Text(
-                        opt.label,
-                        style: GoogleFonts.inter(
-                          color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.textPrimary,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          fontSize: 12,
+              // Date format dropdown selector
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(80),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AutomotiveColors.stroke, width: 1.0),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: TimeDateProvider.availableDateFormats.any((opt) => opt.pattern == timeDate.dateFormatPattern)
+                        ? timeDate.dateFormatPattern
+                        : TimeDateProvider.availableDateFormats.first.pattern,
+                    dropdownColor: AutomotiveColors.panelDark,
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AutomotiveColors.electricCyan),
+                    isExpanded: true,
+                    borderRadius: BorderRadius.circular(12),
+                    items: TimeDateProvider.availableDateFormats.map((opt) {
+                      final isSelected = opt.pattern == timeDate.dateFormatPattern;
+                      return DropdownMenuItem<String>(
+                        value: opt.pattern,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today_rounded,
+                              size: 16,
+                              color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.textSecondary,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    opt.label,
+                                    style: GoogleFonts.inter(
+                                      color: isSelected ? AutomotiveColors.electricCyan : AutomotiveColors.textPrimary,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      fontSize: 13,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    opt.formatExample(now),
+                                    style: GoogleFonts.jetBrainsMono(
+                                      color: isSelected ? AutomotiveColors.textPrimary : AutomotiveColors.textMuted,
+                                      fontSize: 11,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isSelected)
+                              const Icon(Icons.check_circle_rounded, color: AutomotiveColors.electricCyan, size: 18),
+                          ],
                         ),
-                      ),
-                      subtitle: Text(
-                        opt.formatExample(now),
-                        style: GoogleFonts.jetBrainsMono(
-                          color: isSelected ? AutomotiveColors.textPrimary : AutomotiveColors.textMuted,
-                          fontSize: 11,
-                        ),
-                      ),
-                      trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AutomotiveColors.electricCyan, size: 18) : null,
-                      onTap: () => timeDate.setDateFormatPattern(opt.pattern),
-                    ),
+                      );
+                    }).toList(),
+                    selectedItemBuilder: (context) {
+                      return TimeDateProvider.availableDateFormats.map((opt) {
+                        return Row(
+                          children: [
+                            const Icon(Icons.calendar_today_rounded, size: 16, color: AutomotiveColors.electricCyan),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                "${opt.label} (${opt.formatExample(now)})",
+                                style: GoogleFonts.inter(
+                                  color: AutomotiveColors.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList();
+                    },
+                    onChanged: (newPattern) {
+                      if (newPattern != null) {
+                        timeDate.setDateFormatPattern(newPattern);
+                      }
+                    },
                   ),
-                );
-              }),
+                ),
+              ),
             ],
           ),
         );
