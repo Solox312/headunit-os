@@ -98,6 +98,7 @@ _lock = threading.Lock()
 _active_devices = set()      # device paths with a live handoff link
 _attempting_devices = set()  # device paths with a connect loop in flight
 _profile_objects = []        # keep BlueZ profile D-Bus objects alive (prevent GC)
+_agent_object = None         # keep BlueZ agent D-Bus object alive (prevent GC)
 
 
 # ── Minimal protobuf encoding ─────────────────────────────────────────────────
@@ -542,13 +543,18 @@ def main():
     _bus = dbus.SystemBus()
 
     # ── Register built-in BlueZ pairing agent (auto-accepts passkey/PIN) ──────
+    global _agent_object
     agent_manager = dbus.Interface(_bus.get_object("org.bluez", "/org/bluez"),
                                    "org.bluez.AgentManager1")
-    agent = AutoPairingAgent(_bus, AGENT_PATH)
+    _agent_object = AutoPairingAgent(_bus, AGENT_PATH)
     try:
-        agent_manager.RegisterAgent(AGENT_PATH, "NoInputNoOutput")
+        agent_manager.UnregisterAgent(AGENT_PATH)
+    except Exception:
+        pass
+    try:
+        agent_manager.RegisterAgent(AGENT_PATH, "DisplayYesNo")
         agent_manager.RequestDefaultAgent(AGENT_PATH)
-        emit("PAIRING_AGENT_REGISTERED capability=NoInputNoOutput")
+        emit("PAIRING_AGENT_REGISTERED capability=DisplayYesNo")
     except Exception as exc:
         emit(f"PAIRING_AGENT_REGISTER_WARN: {exc}")
 
