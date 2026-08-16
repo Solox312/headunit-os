@@ -346,15 +346,13 @@ def start_connect_loop(device_path):
 
 
 def _advertised_candidates(device_path):
-    """Order candidate UUIDs by what the phone's SDP actually lists."""
     try:
         props = dbus.Interface(_bus.get_object("org.bluez", device_path),
                                "org.freedesktop.DBus.Properties")
         advertised = {str(u).lower() for u in props.Get("org.bluez.Device1", "UUIDs")}
     except dbus.exceptions.DBusException:
         advertised = set()
-    preferred = [u for u in AA_UUID_CANDIDATES if u in advertised]
-    return preferred if preferred else list(AA_UUID_CANDIDATES)
+    return [u for u in AA_UUID_CANDIDATES if u in advertised]
 
 
 def _connect_loop(device_path):
@@ -371,12 +369,11 @@ def _connect_loop(device_path):
             time.sleep(0.5)
 
         candidates = _advertised_candidates(device_path)
-        emit(f"PHONE_SEEN {device_path} candidates={','.join(candidates)}")
+        if not candidates:
+            emit(f"WAITING_FOR_PHONE_INBOUND {device_path} (Head Unit RFCOMM listening on Channel 22)")
+            return
 
-        # Check if phone advertises any of our target UUIDs for outbound connection
-        has_advertised_match = any(c in AA_UUID_CANDIDATES for c in candidates)
-        if not has_advertised_match:
-            emit(f"WAITING_FOR_PHONE_INBOUND {device_path} (Head Unit RFCOMM Server listening on Channel 22)")
+        emit(f"PHONE_SEEN {device_path} candidates={','.join(candidates)}")
 
         for attempt in range(1, CONNECT_ATTEMPTS + 1):
             for uuid in candidates:
