@@ -146,6 +146,13 @@ def patch_openauto(openauto_dir):
     if "#include <QScreen>" not in content:
         content = content.replace("#include <QApplication>", "#include <QApplication>\n#include <QScreen>", 1)
 
+    if "#include <boost/asio/ip/tcp.hpp>" not in content:
+        content = content.replace(
+            "#include <f1x/aasdk/TCP/TCPWrapper.hpp>",
+            "#include <f1x/aasdk/TCP/TCPWrapper.hpp>\n#include <boost/asio/ip/tcp.hpp>",
+            1
+        )
+
     old_mw = """    autoapp::ui::MainWindow mainWindow;
     mainWindow.setWindowFlags(Qt::WindowStaysOnTopHint);"""
     new_mw = """    autoapp::ui::MainWindow mainWindow;
@@ -168,23 +175,28 @@ def patch_openauto(openauto_dir):
         app->start(std::move(socket));
     });
 
-    if(!recentAddressesList.getList().empty())
-    {
-        const std::string ipAddress = recentAddressesList.getList().front();
-        OPENAUTO_LOG(info) << "[autoapp] Auto-connecting wireless to: " << ipAddress;
-        auto socket = std::make_shared<boost::asio::ip::tcp::socket>(ioService);
-        tcpWrapper.asyncConnect(*socket, ipAddress, 50001, [&app, socket, ipAddress](const boost::system::error_code& ec) {
-            if(!ec)
-            {
-                OPENAUTO_LOG(info) << "[autoapp] Connected to wireless device at " << ipAddress;
-                app->start(std::move(socket));
-            }
-            else
-            {
-                OPENAUTO_LOG(error) << "[autoapp] Wireless connect failed: " << ec.message();
-            }
-        });
-    }
+    // Wireless Android Auto: aa_wireless_handoff.py's WifiStartRequest tells the
+    // phone to dial OUT to this head unit's own IP/port over the hotspot Wi-Fi —
+    // so the phone is the TCP client and we must be the TCP server here. aasdk's
+    // TCPWrapper only supports outbound asyncConnect (that's what the block above
+    // uses, for dialing INTO an external wireless dongle on port 5277 — a
+    // different architecture), so a raw boost::asio acceptor is used directly.
+    static const unsigned short WIRELESS_LISTEN_PORT = 50001;
+    auto wirelessAcceptor = std::make_shared<boost::asio::ip::tcp::acceptor>(
+        ioService, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), WIRELESS_LISTEN_PORT));
+    auto wirelessSocket = std::make_shared<boost::asio::ip::tcp::socket>(ioService);
+    OPENAUTO_LOG(info) << "[autoapp] Listening for wireless Android Auto on port " << WIRELESS_LISTEN_PORT;
+    wirelessAcceptor->async_accept(*wirelessSocket, [&app, wirelessAcceptor, wirelessSocket](const boost::system::error_code& ec) {
+        if(!ec)
+        {
+            OPENAUTO_LOG(info) << "[autoapp] Wireless phone connected from " << wirelessSocket->remote_endpoint().address().to_string();
+            app->start(std::move(wirelessSocket));
+        }
+        else
+        {
+            OPENAUTO_LOG(error) << "[autoapp] Wireless accept failed: " << ec.message();
+        }
+    });
 
     app->waitForUSBDevice();"""
     if old_start in content:

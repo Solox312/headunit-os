@@ -265,26 +265,21 @@ def detect_hotspot_ip(explicit):
     return "192.168.50.1"
 
 
-def update_openauto_recent_ip():
+def start_openauto_projection():
+    # autoapp now listens as a TCP *server* on port 50001 for the phone to
+    # dial in (see patch_openauto.py) — it doesn't need to know the phone's
+    # IP ahead of time, just to be up and listening before the phone tries.
+    # openauto.service is Restart=no / started on-demand (it takes over the
+    # display from the kiosk), so it must be (re)started here. Called as
+    # soon as the phone has the Wi-Fi credentials — not after
+    # WIFI_CONNECT_STATUS — to give autoapp the most possible lead time to
+    # boot and bind its listener before the phone finishes Wi-Fi association
+    # and tries to connect.
     try:
-        out = subprocess.check_output(["ip", "-4", "neigh", "show"], text=True, errors="replace")
-        for line in out.splitlines():
-            if "192.168.50." in line:
-                phone_ip = line.split()[0]
-                ini_content = f"[RecentAddresses]\n0={phone_ip}\n"
-                for path in ["/home/carl/openauto_wifi_recent.ini", "/home/carl/.config/openauto/openauto_wifi_recent.ini"]:
-                    try:
-                        os.makedirs(os.path.dirname(path), exist_ok=True)
-                        with open(path, "w") as f:
-                            f.write(ini_content)
-                    except Exception:
-                        pass
-                emit(f"OPENAUTO_RECENT_IP_SAVED {phone_ip}")
-                subprocess.Popen(["sudo", "systemctl", "restart", "openauto.service"])
-                emit("OPENAUTO_PROJECTION_STARTED")
-                break
+        subprocess.Popen(["sudo", "systemctl", "restart", "openauto.service"])
+        emit("OPENAUTO_PROJECTION_STARTED")
     except Exception as exc:
-        emit(f"WARN openauto ip sync: {exc}")
+        emit(f"WARN openauto start: {exc}")
 
 
 def handle_connection(fd, config, device_path):
@@ -334,11 +329,11 @@ def handle_connection(fd, config, device_path):
                             encode_wifi_info_response(config.ssid, config.psk, bssid))
                 credentials_sent = True
                 emit(f"CREDENTIALS_SENT ssid={config.ssid} bssid={bssid}")
+                start_openauto_projection()
             elif msg_id == MSG_WIFI_START_RESPONSE:
                  emit("WIFI_START_RESPONSE")
             elif msg_id == MSG_WIFI_CONNECT_STATUS:
                  emit(f"WIFI_CONNECT_STATUS len={len(payload)}")
-                 threading.Timer(1.5, update_openauto_recent_ip).start()
             elif msg_id == MSG_WIFI_PING_REQUEST:
                 write_frame(fd, MSG_WIFI_PING_RESPONSE, b"")
                 emit("PING_REPLIED")

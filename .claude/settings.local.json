@@ -21,7 +21,13 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(grep *)",
       "Bash(bash -n \"C:\\\\Users\\\\cnieves.wmg\\\\Desktop\\\\Projects\\\\headunit-os\\\\scripts\\\\install_openauto.sh\")",
-      "Bash(bash -n \"C:\\\\Users\\\\cnieves.wmg\\\\Desktop\\\\Projects\\\\headunit-os\\\\scripts\\\\install_huos.sh\")"
+      "Bash(bash -n \"C:\\\\Users\\\\cnieves.wmg\\\\Desktop\\\\Projects\\\\headunit-os\\\\scripts\\\\install_huos.sh\")",
+      "Bash(gh api *)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(curl -s https://raw.githubusercontent.com/f1xpl/openauto/master/include/f1x/openauto/autoapp/App.hpp)",
+      "Bash(curl -s https://raw.githubusercontent.com/f1xpl/aasdk/master/include/f1x/aasdk/TCP/ITCPEndpoint.hpp)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('scripts/aa_wireless_handoff.py'\\).read\\(\\)\\)\")",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('scripts/patch_openauto.py'\\).read\\(\\)\\)\")"
     ]
   }
 }
